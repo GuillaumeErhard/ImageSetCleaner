@@ -1,11 +1,10 @@
-from random import randint
 import numpy as np
 from PIL import Image
 import os
 from win32api import GetSystemMetrics
-from Saliency import get_saliency_ft
-import scipy.misc
+from Saliency import get_saliency_ft_direct,get_saliency_mbd
 from sklearn.metrics import accuracy_score
+from skimage.io import imread_collection
 from sklearn import cluster
 from sklearn import mixture
 from sklearn.covariance import EllipticEnvelope
@@ -24,31 +23,28 @@ from sklearn import cluster, datasets
 # https://www.researchgate.net/publication/224576812_Using_one-class_SVM_outliers_detection_for_verification_of_collaboratively_tagged_image_training_sets
 
 
-# TODO : Change how image_list ist done and directly add vector of np array one after the other
+# TODO : Get incepetion
+# TODO : Simple visualiser ( Tkinter ?)
 def load_image(path, width, length):
-    images_location = os.listdir(path)
-    image_list = []
+    path = os.path.abspath(path) + '\\'
 
-    for i in range(len(images_location)):
-        im = Image.open(path + images_location[i])
-        image_list.append(np.array(im.resize((width, length))))
+    col = imread_collection(path + '*.jpg')
+    col = np.array(col)
 
-    image_list = np.array(image_list)
+    # Check for alpha
+    for idx, elem in enumerate(col):
+        if not elem.shape[2] == 3:
+            col[idx] = cv2.cvtColor(elem, cv2.COLOR_RGBA2RGB)
 
-    return image_list
+    col = np.array([cv2.resize(im, (width, length)) for im in col])
+
+    return col
 
 
 def load_saliency(path, width, length):
-    images_location = os.listdir(path)
-    image_list = []
+    collection = load_image(path, width, length)
 
-    for i in range(len(images_location)):
-        im = get_saliency_ft(path + images_location[i])
-        image_list.append(scipy.misc.imresize(im, (width, length)))
-
-    image_list = np.array(image_list)
-
-    return image_list
+    return np.array([get_saliency_ft_direct(img) for img in collection])
 
 
 def stich_images(shape, images):
@@ -97,16 +93,16 @@ def outlier_detection_check(image_set, ground_true):
     clf.fit(image_set)
 
     predictions = clf.row_labels_
-    print(predictions)
+    #print(predictions)
     sum_row_labels = np.sum(predictions)
     majority_class = int(np.sum(predictions) / (len(predictions) / 2 - 1))
-    print(predictions)
-    print(majority_class)
-
+    #print(predictions)
+    #print(majority_class)
+    print(predictions.shape, ground_true.shape)
     if majority_class == 1:
         ground_true = 1 - ground_true
 
-    print(ground_true)
+    #print(ground_true)
 
     print('Accuracy :', accuracy_score(ground_true, clf.row_labels_))
 
@@ -118,12 +114,13 @@ def main():
     width = 280
     length = 180
 
-    dir_location = ['./Test_cluster_small/', './Test_cluster_few_to_many/']
+    dir_location = ['./Test_cluster_no_outlier/', './Test_cluster_small/']
     # 0 inlier, 1 outlier
-    ground_true = [np.array([0, 0, 0, 0, 1, 1, 0, 1, 0, 0]), np.array([np.zeros(154), 1])]
+    ground_true = [np.zeros(77), np.array([0, 0, 0, 0, 1, 1, 0, 1, 0, 0])]
 
     for idx, dir in enumerate(dir_location):
         image_set = load_image(dir, width, length)
+        #stich_images((width, length), image_set)
 
         outlier_detection_check(image_set, ground_true[idx])
 
@@ -131,7 +128,7 @@ def main():
         image_set = load_saliency(dir, width, length)
         print('Time to get saliency :', time.time() - t0)
 
-        stich_images((width, length), image_set)
+        #stich_images((width, length), image_set)
 
         outlier_detection_check(image_set, ground_true[idx])
 
