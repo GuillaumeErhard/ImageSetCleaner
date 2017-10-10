@@ -3,7 +3,7 @@ from PIL import Image
 import os
 from win32api import GetSystemMetrics
 from Saliency import get_saliency_ft_direct,get_saliency_mbd
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score,precision_score,recall_score
 from skimage.io import imread_collection
 from sklearn import cluster
 from sklearn import mixture
@@ -65,7 +65,6 @@ def stich_images(shape, images):
 
             if idx_line * images_in_column_max + idx_column >= nb_images:
                 break
-
             img_with_pil = Image.fromarray(images[idx_line * images_in_column_max + idx_column])
             stitched_image.paste(im=img_with_pil, box=(idx_line * shape[0], idx_column * shape[1]))
 
@@ -76,37 +75,54 @@ def rgb2gray(rgb):
     return np.dot(rgb[...,:3], [0.299, 0.587, 0.114])
 
 
+"""
+    N.B : The detector breaks with a full black image.
+"""
 def outlier_detection_check(image_set, ground_true):
     t0 = time.time()
-
     # Rgb2gray
-    image_set = np.array([rgb2gray(im_rgb) for im_rgb in image_set])
-    # Saliency
-    # np.array([rgb2gray(im_rgb) for im_rgb in image_set])
+    if len(image_set.shape) > 3:
+        image_set = np.array([rgb2gray(im_rgb) for im_rgb in image_set])
 
     # Flatten image
     image_set = np.reshape(image_set, [image_set.shape[0], -1])
 
 
     # http://scikit-learn.org/stable/modules/generated/sklearn.cluster.bicluster.SpectralBiclustering.html
-    clf = cluster.SpectralBiclustering(n_clusters=2, n_components=11, n_best=11)
-    clf.fit(image_set)
+    # clf = cluster.SpectralBiclustering(n_clusters=2, method='log', random_state=42, svd_method="arpack")
+    # clf.fit(image_set)
+    #
+    # predictions = clf.row_labels_
 
-    predictions = clf.row_labels_
+    # http://scikit-learn.org/stable/auto_examples/cluster/plot_agglomerative_clustering.html#sphx-glr-auto-examples-cluster-plot-agglomerative-clustering-py
+    clf = cluster.AgglomerativeClustering(n_clusters=2)
+    clf.fit(image_set)
+    predictions = clf.labels_
     #print(predictions)
     sum_row_labels = np.sum(predictions)
-    majority_class = int(np.sum(predictions) / (len(predictions) / 2 - 1))
+    majority_class = np.sum(predictions) > (len(predictions) / 2 - 1)
     #print(predictions)
     #print(majority_class)
-    print(predictions.shape, ground_true.shape)
-    if majority_class == 1:
+    print(predictions)
+    if majority_class:
         ground_true = 1 - ground_true
 
     #print(ground_true)
 
-    print('Accuracy :', accuracy_score(ground_true, clf.row_labels_))
+    print('Accuracy :', str(accuracy_score(ground_true, predictions))[:4], 'Precision',
+          str(precision_score(ground_true, predictions))[:6], 'Recall', str(recall_score(ground_true, predictions))[:6])
 
     print('Time taken for classification :', time.time() - t0)
+
+    detected_images = [im.reshape([180, 280]) for idx, im in enumerate(image_set) if predictions[idx] == 1]
+    # if len(detected_images) >25:
+    sent_images = 0
+    image_sent_one_go = 30
+    while sent_images + image_sent_one_go < len(detected_images):
+        stich_images((280, 180), detected_images[sent_images:sent_images+image_sent_one_go])
+        sent_images += image_sent_one_go
+
+    stich_images((280, 180), detected_images[sent_images:])
 
 
 def main():
@@ -114,11 +130,16 @@ def main():
     width = 280
     length = 180
 
-    dir_location = ['./Test_cluster_no_outlier/', './Test_cluster_small/']
+    dir_location = ['./Test_cluster_no_outlier/', './Test_cluster_small/', './Test_cluster_1/', './Test_cluster_2/']
     # 0 inlier, 1 outlier
-    ground_true = [np.zeros(77), np.array([0, 0, 0, 0, 1, 1, 0, 1, 0, 0])]
+    ground_true = [np.zeros(75), np.array([0, 0, 0, 0, 1, 1, 0, 1, 0, 0]), np.concatenate([[1, 1, 1, 1], np.zeros(52)]),
+                   np.concatenate([np.zeros(82), [1, 1, 1, 1, 1]])]
+
+    dir_location = dir_location[1:]
+    ground_true = ground_true[1:]
 
     for idx, dir in enumerate(dir_location):
+        print("Currenty at :", dir)
         image_set = load_image(dir, width, length)
         #stich_images((width, length), image_set)
 
