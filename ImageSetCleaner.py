@@ -1,7 +1,6 @@
 import numpy as np
 from PIL import Image
 import os
-# from win32api import GetSystemMetrics
 from Saliency import get_saliency_ft, get_saliency_mbd
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from skimage.io import imread_collection
@@ -46,28 +45,6 @@ def load_saliency(path, width, length):
     return np.array([get_saliency_ft(img) for img in collection])
 
 
-def stich_images(shape, images):
-    width_screen = GetSystemMetrics(0)
-    height_screen = GetSystemMetrics(1)
-
-    nb_images = len(images)
-
-    images_in_line_max = width_screen // shape[0]
-    images_in_column_max = height_screen // shape[1]
-
-    stitched_image = Image.new('RGB', (width_screen, height_screen))
-
-    for idx_line in range(images_in_line_max):
-        for idx_column in range(images_in_column_max):
-
-            if idx_line * images_in_column_max + idx_column >= nb_images:
-                break
-            img_with_pil = Image.fromarray(images[idx_line * images_in_column_max + idx_column])
-            stitched_image.paste(im=img_with_pil, box=(idx_line * shape[0], idx_column * shape[1]))
-
-    stitched_image.show()
-
-
 def rgb2gray(rgb):
     return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
 
@@ -110,44 +87,6 @@ def get_scoring(ground_truth, predictions):
     return accuracy, precision, recall
 
 
-def see_false_positive(image_set, predictions, ground_truth):
-    """
-    Construct and display images that were mislabeled by our classifier
-    :param image_set: Entire set of images
-    :param predictions:  Vector of labels given by the classifier
-    :param ground_truth:  Vector of labels of the data
-    """
-
-    false_positives = [im.reshape([280, 180]) for idx, im in enumerate(image_set) if
-                       predictions[idx] == 1 and ground_truth[idx] == 0]
-    sent_images = 0
-    image_sent_one_go = 30
-    while sent_images + image_sent_one_go < len(false_positives):
-        stich_images((280, 180), false_positives[sent_images:sent_images + image_sent_one_go])
-        sent_images += image_sent_one_go
-
-    stich_images((280, 180), false_positives[sent_images:])
-
-
-def see_false_negative(image_set, predictions, ground_truth):
-    """
-    Construct and display images that were mislabeled by our classifier
-    :param image_set: Entire set of images
-    :param predictions:  Vector of labels given by the classifier
-    :param ground_truth:  Vector of labels of the data
-    """
-
-    false_positives = [im.reshape([280, 180]) for idx, im in enumerate(image_set) if
-                       predictions[idx] == 0 and ground_truth[idx] == 1]
-    sent_images = 0
-    image_sent_one_go = 30
-    while sent_images + image_sent_one_go < len(false_positives):
-        stich_images((280, 180), false_positives[sent_images:sent_images + image_sent_one_go])
-        sent_images += image_sent_one_go
-
-    stich_images((280, 180), false_positives[sent_images:])
-
-
 def detection_with_agglomaritve_clustering(image_set):
     """
     Really good if the classes you are analyzing are close to what the network learned.
@@ -164,7 +103,6 @@ def detection_with_agglomaritve_clustering(image_set):
     predictions = clf.labels_
 
     predictions = normalize_predictions(predictions)
-
 
     return predictions
 
@@ -219,30 +157,6 @@ def detection_with_birch(image_set):
     predictions = normalize_predictions(predictions)
 
     return predictions
-
-
-def get_nb_false_negative(ground_truth, predictions):
-    nb_false_neg = 0
-
-    for idx, pred in enumerate(predictions):
-        if pred == 0 and ground_truth[idx] == 1:
-            nb_false_neg += 1
-
-    return nb_false_neg
-
-
-def get_nb_false_positive(ground_truth, predictions):
-    nb_false_pos = 0
-
-    for idx, pred in enumerate(predictions):
-        if pred == 1 and ground_truth[idx] == 0:
-            nb_false_pos += 1
-
-    return nb_false_pos
-
-
-def get_nb_outlier(ground_truth):
-    return np.sum(ground_truth)
 
 
 def main():

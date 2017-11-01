@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import time
 import os
 import warnings
+import tinker
+
 
 def get_nb_false_negative(ground_truth, predictions):
     nb_false_neg = 0
@@ -31,8 +33,7 @@ def get_nb_outlier(ground_truth):
     return np.sum(ground_truth)
 
 
-def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenecks, architecture_chosen='MobileNet_1.0_224',
-                                model_location='../model'):
+def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenecks):
     """
 
     :param main_label_bottlenecks: Numpy array containing all the bottleneck values of your main label.
@@ -120,35 +121,36 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
     plt.show()
 
 
-def benchmark_classifier(main_label, pollution_labels, architecture_chosen='MobileNet_1.0_224',
-                         model_location='../model'):
+def benchmark_spectral(main_label, pollution_labels):
     """
 
-        :param main_label_dir: Destination where the images of your main label are located.
-        :param polution_label_directory: List of string or simple string of  where your image of your poluted label are.
+        :param main_label_dir: Numpy array containing all the bottleneck values of your main label.
+        :param polution_label_directory:  Numpy array containing all the bottleneck values of your polution label.
         :param architecture_chosen: Which model architecture to use. Ranging from the incepetion to the MobileNet model
         :param model_location: Where the model will be downloaded
-        :return: Nothing. But will display graph
+        :return: Nothing. But will display graph, and info in the console
         """
 
-    t0 = time.time()
+    true_label = np.zeros(len(main_label_bottlenecks))
 
-    if type(pollution_labels) is str:
-        polution_bottlenecks = get_bottlenecks_values(polution_label_directory, architecture_chosen,
-                                                      model_dir=model_location)
-    else:
-        pollution_labels = np.array()
-        for dir in pollution_labels:
-            polution_bottlenecks = np.concatenate(pollution_labels, get_bottlenecks_values(dir, architecture_chosen,
-                                                                                           model_dir=model_location))
+    nb_point_calculation = 10
+    steps_in_calculation = tuple(
+        int(len(polution_label_bottlenecks) / nb_point_calculation * i) for i in range(1, nb_point_calculation + 1))
 
-        pollution_labels = np.random.shuffle(pollution_labels)
+    tuned_parameters = [{'n_clusters' : [2], }]
 
-    main_label_bottlenecks = get_bottlenecks_values(main_label_dir, architecture_chosen,
-                                                    model_dir=model_location)
 
-    print("Finished to get bottlenecks, generated in : ", time.time() - t0)
+def semi_supervised(main_label, pollution_labels, synthetic_pollution):
+    """
+        This function is to test my hypothesis, given, the graph that we need a minimum of pollution, to have great result.
+        So we will add fake pollution for our classifier, and take them out afterward.
 
+    :param main_label: Numpy array containing all the bottleneck values of your main label.
+    :param pollution_labels: Numpy array containing all the bottleneck values of your polution label.
+    :param synthetic_pollution: Numpy array containing synthetic pollution, that will be as random as possible
+    :return: Nothing. But will display graph, and info in the console
+    """
+    print('TODO')
 
 def load_bottleneck(image_dir, bottlenick_dir, architecture_chosen='MobileNet_1.0_224', model_location='../model'):
     """
@@ -185,13 +187,95 @@ def load_bottleneck(image_dir, bottlenick_dir, architecture_chosen='MobileNet_1.
     return bottleneck_values
 
 
+def stich_images(shape, images):
+    """
+        Given a shape you want for your images, will create a mozaic, the size of your screen to visualize multiple
+        image at once.
+
+    :param shape: Tuple containing the shape of a single image.
+    :param images: List containing all your images.
+    :return: Nothing, will pop the created image, with your default image viewer.
+    """
+
+    root = tk.Tk()
+
+    width_screen = root.winfo_screenwidth()
+    height_screen = root.winfo_screenheight()
+
+    nb_images = len(images)
+
+    images_in_line_max = width_screen // shape[0]
+    images_in_column_max = height_screen // shape[1]
+
+    stitched_image = Image.new('RGB', (width_screen, height_screen))
+
+    for idx_line in range(images_in_line_max):
+        for idx_column in range(images_in_column_max):
+
+            if idx_line * images_in_column_max + idx_column >= nb_images:
+                break
+            img_with_pil = Image.fromarray(images[idx_line * images_in_column_max + idx_column])
+            stitched_image.paste(im=img_with_pil, box=(idx_line * shape[0], idx_column * shape[1]))
+
+    stitched_image.show()
+
+
+def see_false_positive(image_set, predictions, ground_truth):
+    """
+    Construct and display images that were mislabeled by our classifier
+    :param image_set: Entire set of images
+    :param predictions:  Vector of labels given by the classifier
+    :param ground_truth:  Vector of labels of the data
+    """
+
+    width_images = 280
+    height_images = 180
+
+    false_positives = [im.reshape([width_images, height_images]) for idx, im in enumerate(image_set) if
+                       predictions[idx] == 1 and ground_truth[idx] == 0]
+    sent_images = 0
+    image_sent_one_go = 30
+    while sent_images + image_sent_one_go < len(false_positives):
+        stich_images((width_images, height_images), false_positives[sent_images:sent_images + image_sent_one_go])
+        sent_images += image_sent_one_go
+
+    stich_images((width_images, height_images), false_positives[sent_images:])
+
+
+def see_false_negative(image_set, predictions, ground_truth):
+    """
+    Construct and display images that were mislabeled by our classifier
+    :param image_set: Entire set of images
+    :param predictions:  Vector of labels given by the classifier
+    :param ground_truth:  Vector of labels of the data
+    """
+
+    width_images = 280
+    height_images = 180
+
+    false_negatives = [im.reshape([width_images, height_images]) for idx, im in enumerate(image_set) if
+                       predictions[idx] == 0 and ground_truth[idx] == 1]
+    sent_images = 0
+    image_sent_one_go = 30
+    while sent_images + image_sent_one_go < len(false_negatives):
+        stich_images((width_images, height_images), false_negatives[sent_images:sent_images + image_sent_one_go])
+        sent_images += image_sent_one_go
+
+    stich_images((width_images, height_images), false_negatives[sent_images:])
+
+
 def main():
     image_dir = ['./Cat', './Dog', './Flag', './Noise']
 
-    bottlencks = load_bottleneck(image_dir, './Saved_bottlenecks')
+    bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks')
 
-    benchmark_one_class_poluted(bottlencks['Cat'], bottlencks['Noise'])
+    benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
 
+    bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks', architecture_chosen = 'inception_v3')
+
+    benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
+
+    see_false_negative()
 
 if __name__ == '__main__':
     main()
