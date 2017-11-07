@@ -1,12 +1,20 @@
 import numpy as np
 from Bottleneck import get_bottlenecks_values
-from ImageSetCleaner import detection_with_kmeans, detection_with_agglomaritve_clustering, detection_with_meanshift, \
-    detection_with_birch
+from ImageSetCleaner import detection_with_kmeans, detection_with_agglomaritve_clustering, detection_with_feature_agglo, \
+    detection_with_birch, semi_supervised_detection
 import matplotlib.pyplot as plt
 import time
 import os
 import warnings
-import tinker
+import tkinter as tk
+from PIL import Image
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.grid_search import  GridSearchCV
+from sklearn.metrics import f1_score, make_scorer
+from sklearn.metrics import accuracy_score, precision_score, recall_score
+from sklearn import decomposition
+from sklearn import manifold
+
 
 
 def get_nb_false_negative(ground_truth, predictions):
@@ -33,6 +41,20 @@ def get_nb_outlier(ground_truth):
     return np.sum(ground_truth)
 
 
+def get_scoring(ground_truth, predictions):
+    """
+
+    :param predictions: Vector of labels given by the classifier
+    :param ground_truth: Vector of labels of the data
+    :return: accuracy, precision, recall
+    """
+    accuracy = accuracy_score(ground_truth, predictions)
+    precision = precision_score(ground_truth, predictions)
+    recall = precision_score(ground_truth, predictions)
+
+    return accuracy, precision, recall
+
+
 def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenecks):
     """
 
@@ -42,7 +64,6 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
     :param model_location: Where the model will be downloaded
     :return: Nothing. But will display graph
     """
-
 
     if len(polution_label_bottlenecks) > len(main_label_bottlenecks):
         warnings.warn('More polution label than true label, the array is truncated')
@@ -60,8 +81,8 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
     spectral_fn_accumulator = np.zeros(nb_point_calculation)
     spectral_fp_accumulator = np.zeros(nb_point_calculation)
 
-    mean_shift_fn_accumulator = np.zeros(nb_point_calculation)
-    mean_shift_fp_accumulator = np.zeros(nb_point_calculation)
+    feature_agglo_fn_accumulator = np.zeros(nb_point_calculation)
+    feature_agglo_fp_accumulator = np.zeros(nb_point_calculation)
 
     birch_fn_accumulator = np.zeros(nb_point_calculation)
     birch_fp_accumulator = np.zeros(nb_point_calculation)
@@ -84,10 +105,10 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
         spectral_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / (nb_cat_bottlenecks + i) * 100
         spectral_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / (nb_cat_bottlenecks + i) * 100
 
-        predictions = detection_with_meanshift(image_set)
-        mean_shift_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / (
+        predictions = detection_with_feature_agglo(image_set)
+        feature_agglo_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / (
             nb_cat_bottlenecks + i) * 100
-        mean_shift_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / (
+        feature_agglo_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / (
             nb_cat_bottlenecks + i) * 100
 
         predictions = detection_with_birch(image_set)
@@ -98,51 +119,110 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
 
     line_k_means, = plt.plot(x_axis, k_means_fn_accumulator, 'ro')
     line_spectral, = plt.plot(x_axis, spectral_fn_accumulator, 'gx')
-    line_mean_shift, = plt.plot(x_axis, mean_shift_fn_accumulator, 'bs')
+    line_feature_agglo, = plt.plot(x_axis, feature_agglo_fn_accumulator, 'bs')
     line_birch, = plt.plot(x_axis, birch_fn_accumulator, 'k^')
 
     plt.xlabel('% of pollution')
     plt.ylabel('% of false positive')
-    plt.legend([line_k_means, line_spectral, line_mean_shift, line_birch],
-               ['k-means', 'Spectral Clustering', 'Mean Shift', 'Birch'], loc='best')
+    plt.legend([line_k_means, line_spectral, line_feature_agglo, line_birch],
+               ['k-means', 'Spectral Clustering', 'Feature Agglomeration', 'Birch'], loc='best')
 
     plt.figure()
 
     line_k_means, = plt.plot(x_axis, k_means_fp_accumulator, 'ro')
     line_spectral, = plt.plot(x_axis, spectral_fp_accumulator, 'gx')
-    line_mean_shift, = plt.plot(x_axis, mean_shift_fp_accumulator, 'bs')
+    line_feature_agglo, = plt.plot(x_axis, feature_agglo_fp_accumulator, 'bs')
     line_birch, = plt.plot(x_axis, birch_fp_accumulator, 'k^')
 
     plt.xlabel('% of pollution')
     plt.ylabel('% of false negative')
-    plt.legend([line_k_means, line_spectral, line_mean_shift, line_birch],
-               ['k-means', 'Spectral Clustering', 'Mean Shift', 'Birch'], loc='best')
+    plt.legend([line_k_means, line_spectral, line_feature_agglo, line_birch],
+               ['k-means', 'Spectral Clustering', 'Feature Agglomeration', 'Birch'], loc='best')
 
     plt.show()
 
 
-def benchmark_spectral(main_label, pollution_labels):
+def benchmark_spectral(main_label_bottlenekcs, pollution_labels_bottlenecks):
+    # TODO : Delete / refractor ?
     """
 
-        :param main_label_dir: Numpy array containing all the bottleneck values of your main label.
-        :param polution_label_directory:  Numpy array containing all the bottleneck values of your polution label.
+        :param main_label_bottlenekcs: Numpy array containing all the bottleneck values of your main label.
+        :param pollution_labels_bottlenecks:  Numpy array containing all the bottleneck values of your polution label.
         :param architecture_chosen: Which model architecture to use. Ranging from the incepetion to the MobileNet model
         :param model_location: Where the model will be downloaded
         :return: Nothing. But will display graph, and info in the console
         """
 
-    true_label = np.zeros(len(main_label_bottlenecks))
+    true_label = np.zeros(len(main_label_bottlenekcs))
 
     nb_point_calculation = 10
     steps_in_calculation = tuple(
-        int(len(polution_label_bottlenecks) / nb_point_calculation * i) for i in range(1, nb_point_calculation + 1))
+        int(len(pollution_labels_bottlenecks) / nb_point_calculation * i) for i in range(1, nb_point_calculation + 1))
 
-    tuned_parameters = [{'n_clusters' : [2], }]
+    tuned_parameters = {'affinity': ['cosine', 'l1', 'manhattan'], 'linkage' : ['complete', 'average']}
+    spectral = AgglomerativeClustering(n_clusters=2)
+    scorer = make_scorer(f1_score)
+
+    clf = GridSearchCV(spectral, tuned_parameters, scoring=scorer)
+
+    # Test with 5 % pollution
+    X = np.concatenate((main_label_bottlenekcs, pollution_labels_bottlenecks[: int(len(main_label_bottlenekcs) * 0.05), :]))
+    Y = np.concatenate((np.zeros(len(main_label_bottlenekcs)), np.ones(int(len(main_label_bottlenekcs) * 0.05))))
+    clf.fit(X, Y)
+
+    print(clf.best_params_)
+    print(clf.best_score_)
+
+
+def see_iso_map(bottlenecks, labels):
+    """
+
+    :param bottlenecks:
+    :param labels:
+    :return: Nothing, will just plot a scatter plot to show the distribution of our data after dimensionality reduction.
+    """
+
+    n_samples, n_features = bottlenecks.shape
+    n_neighbors = 25
+    n_components = 2
+    start_index_outlier = np.where(labels == 1)[0][0]
+    alpha_inlier = 0.25
+
+    B_iso = manifold.Isomap(n_neighbors, n_components).fit_transform(bottlenecks)
+    B_pca = decomposition.TruncatedSVD(n_components=2).fit_transform(bottlenecks)
+    B_lle = manifold.LocallyLinearEmbedding(n_neighbors, n_components, method='standard').fit_transform(bottlenecks)
+    B_spec = manifold.SpectralEmbedding(n_components=n_components, random_state=42,
+                                        eigen_solver='arpack').fit_transform(bottlenecks)
+
+    plt.figure()
+
+    plt.subplot(221)
+    plt.scatter(B_iso[:start_index_outlier, 0], B_iso[:start_index_outlier, 1], marker='o', c='b', alpha=alpha_inlier)
+    plt.scatter(B_iso[start_index_outlier:, 0], B_iso[start_index_outlier:, 1], marker='^', c='k')
+    plt.title("Isomap projection")
+
+    plt.subplot(222)
+    plt.scatter(B_lle[:start_index_outlier, 0], B_lle[:start_index_outlier, 1], marker='o', c='b', alpha=alpha_inlier)
+    plt.scatter(B_lle[start_index_outlier:, 0], B_lle[start_index_outlier:, 1], marker='^', c='k')
+    plt.title("Locally Linear Embedding")
+
+    plt.subplot(223)
+    plt.scatter(B_pca[:start_index_outlier, 0], B_pca[:start_index_outlier, 1], marker='o', c='b', alpha=alpha_inlier)
+    plt.scatter(B_pca[start_index_outlier:, 0], B_pca[start_index_outlier:, 1], marker='^', c='k')
+    plt.title("Principal Components projection")
+
+    plt.subplot(224)
+    plt.scatter(B_spec[:start_index_outlier, 0], B_spec[:start_index_outlier, 1], marker='o', c='b', alpha=alpha_inlier)
+    plt.scatter(B_spec[start_index_outlier:, 0], B_spec[start_index_outlier:, 1], marker='^', c='k')
+    plt.title("Spectral embedding")
+
+    #plot_embedding(bottlenecks_projected, "Random Projection of the digits")
+    plt.show()
 
 
 def semi_supervised(main_label, pollution_labels, synthetic_pollution):
     """
-        This function is to test my hypothesis, given, the graph that we need a minimum of pollution, to have great result.
+        This function is to test my hypothesis, given, the graph that we need a minimum of pollution, to have better result.
         So we will add fake pollution for our classifier, and take them out afterward.
 
     :param main_label: Numpy array containing all the bottleneck values of your main label.
@@ -151,6 +231,29 @@ def semi_supervised(main_label, pollution_labels, synthetic_pollution):
     :return: Nothing. But will display graph, and info in the console
     """
     print('TODO')
+
+
+def semi_supervised_unit():
+    """
+        Use of group of image, from google image search that have been labeled
+    :return: Nothing will just print the result
+    """
+    dir_location = ['./Test_cluster_no_outlier/', './Test_cluster_small/', './Test_cluster_1/', './Test_cluster_2/']
+    ground_true = [np.zeros(75), np.array([0, 0, 0, 0, 1, 1, 0, 1, 0, 0]), np.concatenate([[1, 1, 1, 1], np.zeros(52)]),
+                   np.concatenate([np.zeros(82), [1, 1, 1, 1, 1]])]
+
+    # classifiers = ('kmeans', 'birch', 'feature_agglo', 'agglomerative')
+    classifiers = ('kmeans', 'birch', 'agglomerative')
+    for idx, dir in enumerate(dir_location):
+        # TODO : Classifier feature agllo ne marche pas. Il fait par le vecteur de plus grand taille au lieu du premier. Breaks
+        print('Cluster :', dir)
+        for clf in classifiers:
+            predictions = semi_supervised_detection(dir, clf, 'MobileNet_1.0_224', '../model', '../Cached_pollution')
+            accuracy, precision, recall = get_scoring(ground_true[idx], predictions)
+            print(clf, 'Accuracy', accuracy, 'Precision :', precision, 'Recall', recall)
+
+        #print(predictions.shape)
+
 
 def load_bottleneck(image_dir, bottlenick_dir, architecture_chosen='MobileNet_1.0_224', model_location='../model'):
     """
@@ -266,16 +369,32 @@ def see_false_negative(image_set, predictions, ground_truth):
 
 def main():
     image_dir = ['./Cat', './Dog', './Flag', './Noise']
-
+    # plt.ion()
     bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks')
 
-    benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
+    # benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
+    #
+    # bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks', architecture_chosen = 'inception_v3')
+    #
+    # benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
 
-    bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks', architecture_chosen = 'inception_v3')
+    # benchmark_spectral(bottlenecks['Cat'], bottlenecks['Dog'])
 
-    benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
 
-    see_false_negative()
+    # # TODO : Test this, need le label tho
+    # X = np.concatenate((bottlenecks['Cat'], bottlenecks['Dog'][: int(len(bottlenecks['Dog']) * 0.05), :]))
+    # Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(int(len(bottlenecks['Dog']) * 0.05))))
+    # see_iso_map(X, Y)
+    #
+    # X = np.concatenate((bottlenecks['Cat'], bottlenecks['Noise']))
+    # Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(len(bottlenecks['Noise']) )))
+    # see_iso_map(X, Y)
+    #
+    # plt.show()
+
+    semi_supervised_unit()
+
+    # see_false_negative(detection_with_kmeans())
 
 if __name__ == '__main__':
     main()

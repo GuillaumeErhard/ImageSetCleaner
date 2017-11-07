@@ -2,18 +2,12 @@ import numpy as np
 from PIL import Image
 import os
 from Saliency import get_saliency_ft, get_saliency_mbd
-from sklearn.metrics import accuracy_score, precision_score, recall_score
 from skimage.io import imread_collection
-from sklearn import cluster
-from sklearn import mixture
-from sklearn.covariance import EllipticEnvelope
-from sklearn.ensemble import IsolationForest
-from sklearn import svm
 import cv2
 import time
 from sklearn import cluster, datasets
 from Bottleneck import get_bottlenecks_values
-
+import argparse
 
 # Check :
 # https://machinelearningmastery.com/how-to-identify-outliers-in-your-data/
@@ -73,20 +67,6 @@ def normalize_predictions(predictions):
     return predictions
 
 
-def get_scoring(ground_truth, predictions):
-    """
-
-    :param predictions: Vector of labels given by the classifier
-    :param ground_truth: Vector of labels of the data
-    :return: accuracy, precision, recall
-    """
-    accuracy = accuracy_score(ground_truth, predictions)
-    precision = precision_score(ground_truth, predictions)
-    recall = precision_score(ground_truth, predictions)
-
-    return accuracy, precision, recall
-
-
 def detection_with_agglomaritve_clustering(image_set):
     """
     Really good if the classes you are analyzing are close to what the network learned.
@@ -98,10 +78,11 @@ def detection_with_agglomaritve_clustering(image_set):
     """
 
     # http://scikit-learn.org/stable/auto_examples/cluster/plot_agglomerative_clustering.html#sphx-glr-auto-examples-cluster-plot-agglomerative-clustering-py
-    clf = cluster.AgglomerativeClustering(n_clusters=2, )
-    clf.fit(image_set)
-    predictions = clf.labels_
+    clf = cluster.AgglomerativeClustering(n_clusters=2)
 
+    clf.fit(image_set)
+
+    predictions = clf.labels_
     predictions = normalize_predictions(predictions)
 
     return predictions
@@ -125,14 +106,14 @@ def detection_with_kmeans(image_set):
     return predictions
 
 
-def detection_with_meanshift(image_set):
+def detection_with_feature_agglo(image_set):
     """
 
     :param image_set:
     :return: predictions vector
     """
 
-    clf = cluster.AgglomerativeClustering(n_clusters=2)
+    clf = cluster.FeatureAgglomeration(n_clusters=2)
 
     clf.fit(image_set)
 
@@ -159,104 +140,154 @@ def detection_with_birch(image_set):
     return predictions
 
 
-def main():
-    width = 280
-    length = 180
+def grabbing_pollution(architecture, pollution_points, pollution_dir):
+    # TODO Complete architecture
+    """
 
-    dir_location = ['./Test_cluster_no_outlier/', './Test_cluster_small/', './Test_cluster_1/', './Test_cluster_2/',
-                    './Test_cat_vs_dog/']
-    # 0 inlier, 1 outlier
-    ground_true = [np.zeros(75), np.array([0, 0, 0, 0, 1, 1, 0, 1, 0, 0]), np.concatenate([[1, 1, 1, 1], np.zeros(52)]),
-                   np.concatenate([np.zeros(82), [1, 1, 1, 1, 1]]), np.concatenate([np.zeros(1050), np.ones(100)])]
+    :param architecture:
+    :param pollution_points: Number of points desired by the user to be added to the data values.
+    :param pollution_dir: Location of the directory containing the precomputed values.
+    :return: An int that contains how many pollution bottleneck we have and a numpy array containing, bottlencks of
+            random images.
+    """
 
-    dir_location = dir_location[-2:]
-    ground_true = ground_true[-2:]
+    saved_values = os.listdir(pollution_dir)
 
-    for idx, dir in enumerate(dir_location):
-        # print("Currenty at :", dir)
-        # image_set = load_image(dir, width, length)
-        #
-        # # Rgb2gray
-        # image_set = np.array([rgb2gray(im_rgb) for im_rgb in image_set])
-        # image_set = flatten_set(image_set)
-        # #stich_images((width, length), image_set)
-        #
-        # predictions = detection_with_agglomaritve_clustering(image_set)
-        #
-        # accuracy, precision, recall = get_scoring(predictions, ground_true[idx])
-        #
-        # t0 = time.time()
-        # image_set = load_saliency(dir, width, length)
-        # image_set = flatten_set(image_set)
-        # print('Time to get saliency :', time.time() - t0)
-        #
-        # predictions = detection_with_agglomaritve_clustering(image_set)
-        # accuracy, precision, recall = get_scoring(predictions, ground_true[idx])
-        #
-        # print('Accuracy :', str(accuracy)[:4], 'Precision', str(precision)[:6], 'Recall', str(recall)[:6])
+    entry = 'Noise_' + architecture + '.npy'
+    path = os.path.join(pollution_dir, entry)
 
-        t0 = time.time()
-        # image_set = get_all_bottlenecks(dir, architecture='inception_v3', model_dir='./model/')
-        image_set = get_bottlenecks_values(dir, architecture='MobileNet_1.0_224', model_dir='./model/')
+    if entry not in saved_values:
+        print('Pollution label not found')
+        pollution_bottlenecks = np.array()
+        nb_bottlenecks_to_return = 0
+    else:
+        print('Loading bottlenecks from :', path)
+        pollution_bottlenecks = np.load(path)
 
-        print('Time to get bottleneck :', time.time() - t0)
+        nb_bottlenecks = pollution_bottlenecks.shape[0]
 
-        predictions = detection_with_agglomaritve_clustering(image_set)
-        accuracy, precision, recall = get_scoring(ground_true[idx], predictions)
+        if nb_bottlenecks > pollution_points:
+            nb_bottlenecks_to_return = pollution_points
+        else:
+            print('Problem, not enough polluted bottlenecks have been pre computed')
+            nb_bottlenecks_to_return = nb_bottlenecks
 
-        print('Aglomaritive_clustering', 'Accuracy :', str(accuracy)[:4], 'Precision', str(precision)[:6], 'Recall',
-              str(recall)[:6])
-        print('Nb false negative :', get_nb_false_negative(ground_true[idx], predictions), 'Nb false positive :',
-              get_nb_false_positive(ground_true[idx], predictions), 'Out of :', get_nb_outlier(ground_true[idx]),
-              'outliers')
+        pollution_bottlenecks = pollution_bottlenecks[:nb_bottlenecks_to_return, :]
 
-        predictions = detection_with_kmeans(image_set)
-        accuracy, precision, recall = get_scoring(ground_true[idx], predictions)
-
-        print('K-means', 'Accuracy :', str(accuracy)[:4], 'Precision', str(precision)[:6], 'Recall', str(recall)[:6])
-        print('Nb false negative :', get_nb_false_negative(ground_true[idx], predictions), 'Nb false positive :',
-              get_nb_false_positive(ground_true[idx], predictions), 'Out of :', get_nb_outlier(ground_true[idx]),
-              'outliers')
+    return nb_bottlenecks_to_return, pollution_bottlenecks
 
 
-        # clf = mixture.BayesianGaussianMixture(n_components=2)
-        # clf.fit(image_set)
-        # print(clf.predict(image_set))
+def semi_supervised_detection(image_dir, clustering_method, architecture, model_dir, pollution_dir,
+                              pollution_percent=0.20):
+    # TODO : Compléter commentaire des deux fonctions
+    # TODO : Enlever les print
+    """
 
-        #
-        # outliers_fraction = 0.25
-        #
-        # classifiers = {
-        #     "One-Class SVM": svm.OneClassSVM(nu=0.95 * outliers_fraction + 0.05,
-        #                                      kernel="rbf", gamma=0.1),
-        #     "Robust covariance": EllipticEnvelope(contamination=outliers_fraction),
-        #     "Isolation Forest": IsolationForest(max_samples=n_samples,
-        #                                         contamination=outliers_fraction,
-        #                                         random_state=rng),
-        #     "Local Outlier Factor": LocalOutlierFactor(
-        #         n_neighbors=35,
-        #         contamination=outliers_fraction)}
-        #
-        # for i, (clf_name, clf) in enumerate(classifiers.items()):
-        #     # fit the data and tag outliers
-        #     if clf_name == "Local Outlier Factor":
-        #         y_pred = clf.fit_predict(X)
-        #         scores_pred = clf.negative_outlier_factor_
-        #     else:
-        #         clf.fit(X)
-        #         scores_pred = clf.decision_function(X)
-        #         y_pred = clf.predict(X)
-        #     threshold = stats.scoreatpercentile(scores_pred,
-        #                                         100 * outliers_fraction)
-        #     n_errors = (y_pred != ground_truth).sum()
-        #     # plot the levels lines and the points
-        #     if clf_name == "Local Outlier Factor":
-        #         # decision_function is private for LOF
-        #         Z = clf._decision_function(np.c_[xx.ravel(), yy.ravel()])
-        #     else:
-        #         Z = clf.decision_function(np.c_[xx.ravel(), yy.ravel()])
-        #     Z = Z.reshape(xx.shape)
+    :param image_dir:
+    :param clustering_method: Wich algorithm is used to get a prediction on the data.
+    :param architecture:
+    :param model_dir:
+    :param pollution_percent: Fraction of pollution added to our image values.
+    :param pollution_dir:
+    :return: A prediction vector, that is altered by a given amount of random data, to hopefuly get a better performance.
+    """
+
+    image_set = get_bottlenecks_values(image_dir, architecture, model_dir)
+    pollution_points = int(image_set.shape[0] * pollution_percent)
+    pollution_points, pollution_set = grabbing_pollution(architecture, pollution_points, pollution_dir)
+    percent_of_pollution = pollution_points / image_set.shape[0]
+
+    print('We use a pollution of :', percent_of_pollution * 100, '%')
+    #print(image_set.shape, pollution_set.shape)
+    synthetic_set = np.concatenate((image_set, pollution_set))
+    #print(synthetic_set.shape)
+    clustering_methods = ('kmeans', 'birch', 'feature_agglo', 'agglomerative')
+
+    if clustering_method not in clustering_methods:
+        # TODO : Add a shutdown du programme
+        print('')
+
+    if clustering_method == clustering_methods[0]:
+        predictions = detection_with_kmeans(synthetic_set)
+    elif clustering_method == clustering_methods[1]:
+        predictions = detection_with_birch(synthetic_set)
+    elif clustering_method == clustering_methods[2]:
+        predictions = detection_with_feature_agglo(synthetic_set)
+    elif clustering_method == clustering_methods[3]:
+        predictions = detection_with_agglomaritve_clustering(synthetic_set)
+
+    #print(predictions.shape)
+    predictions = predictions[:-pollution_points]
+    #print(predictions.shape)
+    return predictions
+
+
+def main(_):
+    predictions = semi_supervised_detection(FLAGS.image_dir, FLAGS.clustering_method, FLAGS.architecture,
+                                            FLAGS.model_dir, FLAGS.pollution_percent, FLAGS.pollution_dir)
 
 
 if __name__ == '__main__':
-    main()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--image_dir',
+        type=str,
+        default='',
+        help="""\
+        Path to folders of labeled images.\
+        """
+    )
+    parser.add_argument(
+        '--clustering_method',
+        type=str,
+        default='mean_shift',
+        help="""\
+            Choose your method of clustering, between k-means, mean_shift, agglomerattive clustering, birch
+            More info : http://scikit-learn.org/stable/modules/clustering.html
+            """
+    )
+    parser.add_argument(
+        '--architecture',
+        type=str,
+        default='MobileNet_1.0_224',
+        help="""\
+              Which model architecture to use. 'inception_v3' is the most accurate, but
+              also the slowest. For faster or smaller models, chose a MobileNet with the
+              form 'mobilenet_<parameter size>_<input_size>[_quantized]'. For example,
+              'mobilenet_1.0_224' will pick a model that is 17 MB in size and takes 224
+              pixel input images, while 'mobilenet_0.25_128_quantized' will choose a much
+              less accurate, but smaller and faster network that's 920 KB on disk and
+              takes 128x128 images. See https://research.googleblog.com/2017/06/mobilenets-open-source-models-for.html
+              for more information on Mobilenet.\
+              """)
+    parser.add_argument(
+        '--model_dir',
+        type=str,
+        default='/tmp/imagenet',
+        help="""\
+          Path to classify_image_graph_def.pb,
+          imagenet_synset_to_human_label_map.txt, and
+          imagenet_2012_challenge_label_map_proto.pbtxt.\
+          """
+    )
+    parser.add_argument(
+        '--pollution_dir',
+        type=str,
+        default='./Cached_pollution',
+        help="""\
+        Path to cached pollution bottlenecks.\
+        """
+    )
+    parser.add_argument(
+        '--pollution_percent',
+        type=float,
+        default=0.2,
+        help="""\
+            Give the percentage of pre-computed noisy / polluted bottlenecks, from random images to help the clustering
+            algorithm get a good fit.\
+        """
+    )
+
+    FLAGS, unparsed = parser.parse_known_args()
+    main(FLAGS)

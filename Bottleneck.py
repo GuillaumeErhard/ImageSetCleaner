@@ -221,6 +221,7 @@ def create_image_list(image_dir):
         tf.logging.warning(
             'WARNING: Folder has less than 20 images, which may cause issues.')
 
+    # TODO : Enlever sa
     # print(file_list[0].split('\\')[2][:-4])
     # print(file_list.sort(key=alphanum_key))
     # print(file_list)
