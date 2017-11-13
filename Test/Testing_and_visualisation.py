@@ -117,6 +117,8 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
 
     print("Finished to get predictions, generated in : ", time.time() - t0)
 
+    plt.figure()
+
     line_k_means, = plt.plot(x_axis, k_means_fn_accumulator, 'ro')
     line_spectral, = plt.plot(x_axis, spectral_fn_accumulator, 'gx')
     line_feature_agglo, = plt.plot(x_axis, feature_agglo_fn_accumulator, 'bs')
@@ -139,7 +141,7 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
     plt.legend([line_k_means, line_spectral, line_feature_agglo, line_birch],
                ['k-means', 'Spectral Clustering', 'Feature Agglomeration', 'Birch'], loc='best')
 
-    plt.show()
+    #plt.show()
 
 
 def benchmark_spectral(main_label_bottlenekcs, pollution_labels_bottlenecks):
@@ -216,7 +218,6 @@ def see_iso_map(bottlenecks, labels):
     plt.scatter(B_spec[start_index_outlier:, 0], B_spec[start_index_outlier:, 1], marker='^', c='k')
     plt.title("Spectral embedding")
 
-    #plot_embedding(bottlenecks_projected, "Random Projection of the digits")
     plt.show()
 
 
@@ -372,15 +373,15 @@ def main():
     # plt.ion()
     bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks')
 
-    # benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
-    #
-    # bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks', architecture_chosen = 'inception_v3')
+    benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
+    benchmark_one_class_poluted(bottlenecks['Flag'], bottlenecks['Noise'])
+    #bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks', architecture_chosen = 'inception_v3')
     #
     # benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
 
     # benchmark_spectral(bottlenecks['Cat'], bottlenecks['Dog'])
 
-
+    plt.show()
     # # TODO : Test this, need le label tho
     # X = np.concatenate((bottlenecks['Cat'], bottlenecks['Dog'][: int(len(bottlenecks['Dog']) * 0.05), :]))
     # Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(int(len(bottlenecks['Dog']) * 0.05))))
@@ -392,7 +393,7 @@ def main():
     #
     # plt.show()
 
-    semi_supervised_unit()
+    #semi_supervised_unit()
 
     # see_false_negative(detection_with_kmeans())
 

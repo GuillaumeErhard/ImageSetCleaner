@@ -1,7 +1,6 @@
 import numpy as np
 from PIL import Image
 import os
-from Saliency import get_saliency_ft, get_saliency_mbd
 from skimage.io import imread_collection
 import cv2
 import time
@@ -18,6 +17,7 @@ import argparse
 
 
 def load_image(path, width, length):
+
     path = os.path.abspath(path) + '\\'
 
     col = imread_collection(path + '*.jpg')
@@ -33,10 +33,55 @@ def load_image(path, width, length):
     return col
 
 
-def load_saliency(path, width, length):
-    collection = load_image(path, width, length)
+def ensure_directory(path):
 
-    return np.array([get_saliency_ft(img) for img in collection])
+    if not os.path.exists(path):
+        os.mkdir(path)
+
+
+def get_image_paths(image_dir, predictions):
+    """
+    A simple programm that will find the paths of the detected images.
+    :param image_dir: The location of the image directory.
+    :param predictions: The vector of predictions
+    :return: A list containing the paths to every images detected
+    """
+
+    images_names = os.listdir(image_dir)
+    image_paths = []
+
+    if len(images_names) > len(predictions):
+        # TODO : Exit system
+        print('Probably your directory you chose has subdirectories, containing images as well. ')
+    for idx, pred in enumerate(predictions):
+        if pred:
+            image_paths.append(os.path.join(image_dir, images_names[idx]))
+
+    return image_paths
+
+
+def move_images(relocation_dir, image_paths):
+    """
+    This function will move our detected images to the desired location.
+    :param relocation_dir: The new location for our detected images.
+    :param image_paths: A list containing the paths to every images detected
+    :return: Nothing
+    """
+
+    ensure_directory(relocation_dir)
+    for path in image_paths:
+        os.rename(path, os.path.join(relocation_dir, os.path.basename(path)))
+
+
+def delete_images(image_paths):
+    """
+    This function will delete our detected images to the desired location.
+    :param image_paths: A list containing the paths to every images detected
+    :return: Nothing
+    """
+
+    for path in image_paths:
+        os.remove(path)
 
 
 def rgb2gray(rgb):
@@ -113,7 +158,7 @@ def detection_with_feature_agglo(image_set):
     :return: predictions vector
     """
 
-    clf = cluster.FeatureAgglomeration(n_clusters=2)
+    clf = cluster.SpectralClustering(n_clusters=2, random_state=42, eigen_solver='arpack')
 
     clf.fit(image_set)
 
@@ -140,13 +185,13 @@ def detection_with_birch(image_set):
     return predictions
 
 
-def grabbing_pollution(architecture, pollution_points, pollution_dir):
+def grabbing_pollution(architecture, pollution_dir, pollution_points):
     # TODO Complete architecture
     """
 
     :param architecture:
-    :param pollution_points: Number of points desired by the user to be added to the data values.
     :param pollution_dir: Location of the directory containing the precomputed values.
+    :param pollution_points: Number of points desired by the user to be added to the data values.
     :return: An int that contains how many pollution bottleneck we have and a numpy array containing, bottlencks of
             random images.
     """
@@ -187,14 +232,15 @@ def semi_supervised_detection(image_dir, clustering_method, architecture, model_
     :param clustering_method: Wich algorithm is used to get a prediction on the data.
     :param architecture:
     :param model_dir:
-    :param pollution_percent: Fraction of pollution added to our image values.
     :param pollution_dir:
+    :param pollution_percent: Fraction of pollution added to our image values.
     :return: A prediction vector, that is altered by a given amount of random data, to hopefuly get a better performance.
     """
 
     image_set = get_bottlenecks_values(image_dir, architecture, model_dir)
+    #print(len(image_set))
     pollution_points = int(image_set.shape[0] * pollution_percent)
-    pollution_points, pollution_set = grabbing_pollution(architecture, pollution_points, pollution_dir)
+    pollution_points, pollution_set = grabbing_pollution(architecture, pollution_dir, pollution_points)
     percent_of_pollution = pollution_points / image_set.shape[0]
 
     print('We use a pollution of :', percent_of_pollution * 100, '%')
@@ -224,7 +270,23 @@ def semi_supervised_detection(image_dir, clustering_method, architecture, model_
 
 def main(_):
     predictions = semi_supervised_detection(FLAGS.image_dir, FLAGS.clustering_method, FLAGS.architecture,
-                                            FLAGS.model_dir, FLAGS.pollution_percent, FLAGS.pollution_dir)
+                                            FLAGS.model_dir, FLAGS.pollution_dir, FLAGS.pollution_percent)
+
+    image_paths = get_image_paths(FLAGS.image_dir, predictions)
+
+    if FLAGS.processing == 'gui':
+        print('Not yet implemented')
+        # I.e j'envoi image_paths il me les retourne boom je delete
+
+    elif FLAGS.processing == 'move':
+        if FLAGS.relocation_dir:
+            move_images(FLAGS.relocation_dir, image_paths)
+        else:
+            # TODO : NEED TO KILL IT
+            print('')
+
+    elif FLAGS.processing == 'delete':
+        delete_images(image_paths)
 
 
 if __name__ == '__main__':
@@ -241,11 +303,30 @@ if __name__ == '__main__':
     parser.add_argument(
         '--clustering_method',
         type=str,
-        default='mean_shift',
+        default='feature_agglo',
         help="""\
             Choose your method of clustering, between k-means, mean_shift, agglomerattive clustering, birch
-            More info : http://scikit-learn.org/stable/modules/clustering.html
+            More info : http://scikit-learn.org/stable/modules/clustering.html\
             """
+    )
+    parser.add_argument(
+        '--processing',
+        type=str,
+        default='gui',
+        help="""\
+            Select the method you will process the detected image :
+            gui : Will open a window that will let you pick which image to delete and which to keep
+            move : Will move the detected images, to your desired location, with the option --relocation_dir
+            delete : Will delete all the detected images\
+        """
+    )
+    parser.add_argument(
+        '--relocation_dir',
+        type=str,
+        default=None,
+        help="""\
+            Directory where you want the detected images to be moved.
+        """
     )
     parser.add_argument(
         '--architecture',
