@@ -2,7 +2,8 @@ import sys
 import os
 from PyQt5 import QtCore
 from PyQt5.QtGui import QPixmap, QIcon
-from PyQt5.QtWidgets import QWidget, QApplication, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QScrollArea, QAction, QMainWindow
+from PyQt5.QtWidgets import QWidget, QApplication, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel, QScrollArea, QAction, \
+    QMainWindow, QStyle, qApp
 
 
 # https://stackoverflow.com/questions/3157766/how-can-i-achieve-layout-similar-to-google-image-search-in-qt-pyqt/3160725
@@ -14,12 +15,25 @@ from PyQt5.QtWidgets import QWidget, QApplication, QHBoxLayout, QVBoxLayout, QGr
 # TODO: Watch this
 # https://stackoverflow.com/questions/8814452/pyqt-how-to-add-separate-ui-widget-to-qmainwindow
 
+
+def delete_images(image_paths):
+    """
+    This function will delete our detected images to the desired location.
+    :param image_paths: A list containing the paths to every images detected
+    :return: Nothing
+    """
+
+    for path in image_paths:
+        os.remove(path)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, paths, parent=None):
         super(MainWindow, self).__init__(parent)
         self.window = Window(paths)
+        self.paths_selected = []
 
-        deleteAct = QAction(QIcon('./Resource/trash_icon.png'), 'Delete Selection', self)
+        deleteAct = QAction(qApp.style().standardIcon(QStyle.SP_TrashIcon), 'Delete Selection', self)
         deleteAct.setStatusTip('Will delete the selected images')
         deleteAct.triggered.connect(self.delete_images)
         # exitAct.triggered.connect(qApp.quit)
@@ -28,13 +42,37 @@ class MainWindow(QMainWindow):
         self.toolbar = self.addToolBar('Exit')
         self.toolbar.addAction(deleteAct)
 
+        moveAct = QAction(qApp.style().standardIcon(QStyle.SP_FileDialogStart), 'Move Selection', self)
+        moveAct.triggered.connect(self.move_images)
+        self.toolbar.addAction(moveAct)
+
         self.setCentralWidget(self.window)
 
         self.show()
 
     def delete_images(self):
-        print(self.window.get_selection())
+        current_selection = self.window.get_selection()
+        # TODO : Uncomment this
+        #delete_images(current_selection)
 
+        # TODO : Check if empty then do nothing. Peut être fenêtre qui s'ouvre ?
+
+        self.paths_selected += current_selection
+        remaining_paths = self.window.paths
+
+        for path in self.paths_selected:
+            try:
+                remaining_paths.remove(path)
+            except ValueError:
+                pass
+
+        self.window = Window(remaining_paths)
+        self.setCentralWidget(self.window)
+
+    def move_images(self):
+        current_selection = self.window.get_selection()
+        # TODO : Check if empty then do nothing. Peut être fenêtre qui s'ouvre ?
+        print(current_selection)
 
 class ClikableLabel(QLabel):
 
@@ -100,7 +138,6 @@ class Window(QScrollArea):
                 selection.append(path)
 
         return selection
-
 
 
 if __name__ == '__main__':

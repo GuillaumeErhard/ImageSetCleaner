@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, '../')
 import numpy as np
 from Bottleneck import get_bottlenecks_values
 from ImageSetCleaner import detection_with_kmeans, detection_with_agglomaritve_clustering, detection_with_feature_agglo, \
@@ -14,7 +16,6 @@ from sklearn.metrics import f1_score, make_scorer
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn import decomposition
 from sklearn import manifold
-
 
 
 def get_nb_false_negative(ground_truth, predictions):
@@ -373,8 +374,8 @@ def main():
     # plt.ion()
     bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks')
 
-    benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
-    benchmark_one_class_poluted(bottlenecks['Flag'], bottlenecks['Noise'])
+    # benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
+    # benchmark_one_class_poluted(bottlenecks['Flag'], bottlenecks['Noise'])
     #bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks', architecture_chosen = 'inception_v3')
     #
     # benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
@@ -383,13 +384,21 @@ def main():
 
     plt.show()
     # # TODO : Test this, need le label tho
-    # X = np.concatenate((bottlenecks['Cat'], bottlenecks['Dog'][: int(len(bottlenecks['Dog']) * 0.05), :]))
-    # Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(int(len(bottlenecks['Dog']) * 0.05))))
-    # see_iso_map(X, Y)
-    #
-    # X = np.concatenate((bottlenecks['Cat'], bottlenecks['Noise']))
-    # Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(len(bottlenecks['Noise']) )))
-    # see_iso_map(X, Y)
+    # Close label test
+    X = np.concatenate((bottlenecks['Cat'], bottlenecks['Dog'][: int(len(bottlenecks['Dog']) * 0.05), :]))
+    Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(int(len(bottlenecks['Dog']) * 0.05))))
+    see_iso_map(X, Y)
+
+    # Label but noise to help
+    X = np.concatenate((bottlenecks['Dog'][: int(len(bottlenecks['Dog']) * 0.05), :], bottlenecks['Noise']))
+    X = np.concatenate((bottlenecks['Cat'], X))
+    Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(int(len(bottlenecks['Dog']) * 0.05) + int(len(bottlenecks['Noise'])))))
+    see_iso_map(X, Y)
+
+
+    X = np.concatenate((bottlenecks['Cat'], bottlenecks['Noise']))
+    Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(len(bottlenecks['Noise']) )))
+    see_iso_map(X, Y)
     #
     # plt.show()
 

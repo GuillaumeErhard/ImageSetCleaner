@@ -1,12 +1,14 @@
 import numpy as np
-from PIL import Image
 import os
+import sys
 from skimage.io import imread_collection
 import cv2
 import time
+from Gui_Image_Selector import MainWindow
 from sklearn import cluster, datasets
 from Bottleneck import get_bottlenecks_values
 import argparse
+from PyQt5.QtWidgets import QApplication
 
 # Check :
 # https://machinelearningmastery.com/how-to-identify-outliers-in-your-data/
@@ -238,15 +240,12 @@ def semi_supervised_detection(image_dir, clustering_method, architecture, model_
     """
 
     image_set = get_bottlenecks_values(image_dir, architecture, model_dir)
-    #print(len(image_set))
     pollution_points = int(image_set.shape[0] * pollution_percent)
     pollution_points, pollution_set = grabbing_pollution(architecture, pollution_dir, pollution_points)
     percent_of_pollution = pollution_points / image_set.shape[0]
 
     print('We use a pollution of :', percent_of_pollution * 100, '%')
-    #print(image_set.shape, pollution_set.shape)
     synthetic_set = np.concatenate((image_set, pollution_set))
-    #print(synthetic_set.shape)
     clustering_methods = ('kmeans', 'birch', 'feature_agglo', 'agglomerative')
 
     if clustering_method not in clustering_methods:
@@ -262,27 +261,35 @@ def semi_supervised_detection(image_dir, clustering_method, architecture, model_
     elif clustering_method == clustering_methods[3]:
         predictions = detection_with_agglomaritve_clustering(synthetic_set)
 
-    #print(predictions.shape)
     predictions = predictions[:-pollution_points]
-    #print(predictions.shape)
+
     return predictions
 
 
 def main(_):
+
+
     predictions = semi_supervised_detection(FLAGS.image_dir, FLAGS.clustering_method, FLAGS.architecture,
                                             FLAGS.model_dir, FLAGS.pollution_dir, FLAGS.pollution_percent)
 
     image_paths = get_image_paths(FLAGS.image_dir, predictions)
 
+    if len(image_paths) == 0:
+        # TODO : Kill it
+        print("No outlier found.")
+
     if FLAGS.processing == 'gui':
-        print('Not yet implemented')
+        app = QApplication([])
+        window = MainWindow(image_paths)
+        sys.exit(app.exec_())
         # I.e j'envoi image_paths il me les retourne boom je delete
 
     elif FLAGS.processing == 'move':
         if FLAGS.relocation_dir:
+            ensure_directory(FLAGS.relocation_dir)
             move_images(FLAGS.relocation_dir, image_paths)
         else:
-            # TODO : NEED TO KILL IT
+            # TODO : NEED TO KILL IT I.e si il a mit quelque chose
             print('')
 
     elif FLAGS.processing == 'delete':
@@ -297,7 +304,7 @@ if __name__ == '__main__':
         type=str,
         default='',
         help="""\
-        Path to folders of labeled images.\
+        Path to the folder of labeled images.\
         """
     )
     parser.add_argument(
