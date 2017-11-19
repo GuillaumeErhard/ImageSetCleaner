@@ -1,14 +1,11 @@
-import numpy as np
-import os
 import sys
 from skimage.io import imread_collection
 import cv2
-import time
 from Gui_Image_Selector import MainWindow
-from sklearn import cluster, datasets
-from Bottleneck import get_bottlenecks_values
 import argparse
 from PyQt5.QtWidgets import QApplication
+from Predicting import *
+from File_Processing import *
 
 # Check :
 # https://machinelearningmastery.com/how-to-identify-outliers-in-your-data/
@@ -35,57 +32,6 @@ def load_image(path, width, length):
     return col
 
 
-def ensure_directory(path):
-
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-
-def get_image_paths(image_dir, predictions):
-    """
-    A simple programm that will find the paths of the detected images.
-    :param image_dir: The location of the image directory.
-    :param predictions: The vector of predictions
-    :return: A list containing the paths to every images detected
-    """
-
-    images_names = os.listdir(image_dir)
-    image_paths = []
-
-    if len(images_names) > len(predictions):
-        # TODO : Exit system
-        print('Probably your directory you chose has subdirectories, containing images as well. ')
-    for idx, pred in enumerate(predictions):
-        if pred:
-            image_paths.append(os.path.join(image_dir, images_names[idx]))
-
-    return image_paths
-
-
-def move_images(relocation_dir, image_paths):
-    """
-    This function will move our detected images to the desired location.
-    :param relocation_dir: The new location for our detected images.
-    :param image_paths: A list containing the paths to every images detected
-    :return: Nothing
-    """
-
-    ensure_directory(relocation_dir)
-    for path in image_paths:
-        os.rename(path, os.path.join(relocation_dir, os.path.basename(path)))
-
-
-def delete_images(image_paths):
-    """
-    This function will delete our detected images to the desired location.
-    :param image_paths: A list containing the paths to every images detected
-    :return: Nothing
-    """
-
-    for path in image_paths:
-        os.remove(path)
-
-
 def rgb2gray(rgb):
     return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
 
@@ -99,190 +45,46 @@ def flatten_set(image_set):
     return np.reshape(image_set, [image_set.shape[0], -1])
 
 
-def normalize_predictions(predictions):
+def verify_input(_):
     """
-    We take the assumption that the data set contains less than 50 % of outlier.
-    Given that the classifier, gives the label 0 and 1 for the same data
-    randomly. We make sure that an inlier is described as a 0.
-
-    :param predictions:  A 1 D numpy array with the predictions of our detector
-    :return: predictions: A 1 D numpy array with the predictions of our detector, cleaned
-    """
-    if np.sum(predictions) > (len(predictions) / 2 - 1):
-        predictions = 1 - predictions
-
-    return predictions
-
-
-def detection_with_agglomaritve_clustering(image_set):
-    """
-    Really good if the classes you are analyzing are close to what the network learned.
-
-    :param image_set
-    :return: predictions vector
-
-     N.B : The detector breaks with a full black image.
+    This method will check the values given by the user.
+    :param _: Parser
+    :return: Nothing
     """
 
-    # http://scikit-learn.org/stable/auto_examples/cluster/plot_agglomerative_clustering.html#sphx-glr-auto-examples-cluster-plot-agglomerative-clustering-py
-    clf = cluster.AgglomerativeClustering(n_clusters=2)
+    if not os.path.exists(FLAGS.image_dir):
+        raise AssertionError('Image directory not found.')
 
-    clf.fit(image_set)
+    if FLAGS.pollution_percent <0 or FLAGS.pollution_percent > 40:
+        raise AssertionError('Wrong value for pollution. Should be between 0 and 40.')
 
-    predictions = clf.labels_
-    predictions = normalize_predictions(predictions)
+    if FLAGS.clustering_method not in CLUSTERING_METHODS:
+        raise AssertionError('Wrong clustering method given.')
 
-    return predictions
-
-
-def detection_with_kmeans(image_set):
-    """
-    Fast, but might not be able to map great for nonlinear separation of classes.
-
-    :param image_set
-    :return: predictions vector
-    """
-
-    clf = cluster.KMeans(n_clusters=2, random_state=42)
-
-    clf.fit(image_set)
-
-    predictions = clf.labels_
-    predictions = normalize_predictions(predictions)
-
-    return predictions
-
-
-def detection_with_feature_agglo(image_set):
-    """
-
-    :param image_set:
-    :return: predictions vector
-    """
-
-    clf = cluster.SpectralClustering(n_clusters=2, random_state=42, eigen_solver='arpack')
-
-    clf.fit(image_set)
-
-    predictions = clf.labels_
-    predictions = normalize_predictions(predictions)
-
-    return predictions
-
-
-def detection_with_birch(image_set):
-    """
-
-    :param image_set:
-    :return: predictions vector
-    """
-
-    clf = cluster.Birch(n_clusters=2)
-
-    clf.fit(image_set)
-
-    predictions = clf.labels_
-    predictions = normalize_predictions(predictions)
-
-    return predictions
-
-
-def grabbing_pollution(architecture, pollution_dir, pollution_points):
-    # TODO Complete architecture
-    """
-
-    :param architecture:
-    :param pollution_dir: Location of the directory containing the precomputed values.
-    :param pollution_points: Number of points desired by the user to be added to the data values.
-    :return: An int that contains how many pollution bottleneck we have and a numpy array containing, bottlencks of
-            random images.
-    """
-
-    saved_values = os.listdir(pollution_dir)
-
-    entry = 'Noise_' + architecture + '.npy'
-    path = os.path.join(pollution_dir, entry)
-
-    if entry not in saved_values:
-        print('Pollution label not found')
-        pollution_bottlenecks = np.array()
-        nb_bottlenecks_to_return = 0
-    else:
-        print('Loading bottlenecks from :', path)
-        pollution_bottlenecks = np.load(path)
-
-        nb_bottlenecks = pollution_bottlenecks.shape[0]
-
-        if nb_bottlenecks > pollution_points:
-            nb_bottlenecks_to_return = pollution_points
-        else:
-            print('Problem, not enough polluted bottlenecks have been pre computed')
-            nb_bottlenecks_to_return = nb_bottlenecks
-
-        pollution_bottlenecks = pollution_bottlenecks[:nb_bottlenecks_to_return, :]
-
-    return nb_bottlenecks_to_return, pollution_bottlenecks
-
-
-def semi_supervised_detection(image_dir, clustering_method, architecture, model_dir, pollution_dir,
-                              pollution_percent=0.20):
-    # TODO : Compléter commentaire des deux fonctions
-    # TODO : Enlever les print
-    """
-
-    :param image_dir:
-    :param clustering_method: Wich algorithm is used to get a prediction on the data.
-    :param architecture:
-    :param model_dir:
-    :param pollution_dir:
-    :param pollution_percent: Fraction of pollution added to our image values.
-    :return: A prediction vector, that is altered by a given amount of random data, to hopefuly get a better performance.
-    """
-
-    image_set = get_bottlenecks_values(image_dir, architecture, model_dir)
-    pollution_points = int(image_set.shape[0] * pollution_percent)
-    pollution_points, pollution_set = grabbing_pollution(architecture, pollution_dir, pollution_points)
-    percent_of_pollution = pollution_points / image_set.shape[0]
-
-    print('We use a pollution of :', percent_of_pollution * 100, '%')
-    synthetic_set = np.concatenate((image_set, pollution_set))
-    clustering_methods = ('kmeans', 'birch', 'feature_agglo', 'agglomerative')
-
-    if clustering_method not in clustering_methods:
-        # TODO : Add a shutdown du programme
-        print('')
-
-    if clustering_method == clustering_methods[0]:
-        predictions = detection_with_kmeans(synthetic_set)
-    elif clustering_method == clustering_methods[1]:
-        predictions = detection_with_birch(synthetic_set)
-    elif clustering_method == clustering_methods[2]:
-        predictions = detection_with_feature_agglo(synthetic_set)
-    elif clustering_method == clustering_methods[3]:
-        predictions = detection_with_agglomaritve_clustering(synthetic_set)
-
-    predictions = predictions[:-pollution_points]
-
-    return predictions
+    if FLAGS.processing == 'move' and FLAGS.relocation_dir is None:
+        raise AssertionError('You need to specify a relocation directory, if you want to move the detected images.')
 
 
 def main(_):
 
+    verify_input(FLAGS)
 
-    predictions = semi_supervised_detection(FLAGS.image_dir, FLAGS.clustering_method, FLAGS.architecture,
-                                            FLAGS.model_dir, FLAGS.pollution_dir, FLAGS.pollution_percent)
+    image_set = get_bottlenecks_values(FLAGS.image_dir, FLAGS.architecture, FLAGS.model_dir)
+
+    predictions = semi_supervised_detection(image_set, FLAGS.clustering_method, FLAGS.architecture,
+                                            FLAGS.pollution_dir, float(FLAGS.pollution_percent) / 100)
 
     image_paths = get_image_paths(FLAGS.image_dir, predictions)
 
     if len(image_paths) == 0:
-        # TODO : Kill it
-        print("No outlier found.")
+        raise AssertionError('No outlier detected in the directory.')
 
     if FLAGS.processing == 'gui':
         app = QApplication([])
-        window = MainWindow(image_paths)
+        window = MainWindow(FLAGS.image_dir, image_set, image_paths, FLAGS.clustering_method, FLAGS.architecture, FLAGS.pollution_dir,
+                            FLAGS.pollution_percent)
         sys.exit(app.exec_())
-        # I.e j'envoi image_paths il me les retourne boom je delete
+        # TODO : Wtf here ?
 
     elif FLAGS.processing == 'move':
         if FLAGS.relocation_dir:
@@ -370,7 +172,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--pollution_percent',
         type=float,
-        default=0.2,
+        default=25,
         help="""\
             Give the percentage of pre-computed noisy / polluted bottlenecks, from random images to help the clustering
             algorithm get a good fit.\
