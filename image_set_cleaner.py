@@ -1,11 +1,10 @@
 import sys
-from skimage.io import imread_collection
-import cv2
-from Gui_Image_Selector import MainWindow
+from gui_image_selector import MainWindow
 import argparse
 from PyQt5.QtWidgets import QApplication
-from Predicting import *
-from File_Processing import *
+from predicting import *
+from file_processing import *
+from bottleneck import get_bottlenecks_values
 
 # Check :
 # https://machinelearningmastery.com/how-to-identify-outliers-in-your-data/
@@ -13,36 +12,6 @@ from File_Processing import *
 
 # http://www.sciencedirect.com/science/article/pii/S0167947307002204
 # https://www.researchgate.net/publication/224576812_Using_one-class_SVM_outliers_detection_for_verification_of_collaboratively_tagged_image_training_sets
-
-
-def load_image(path, width, length):
-
-    path = os.path.abspath(path) + '\\'
-
-    col = imread_collection(path + '*.jpg')
-    col = np.array(col)
-
-    # Check for alpha
-    for idx, elem in enumerate(col):
-        if not elem.shape[2] == 3:
-            col[idx] = cv2.cvtColor(elem, cv2.COLOR_RGBA2RGB)
-
-    col = np.array([cv2.resize(im, (width, length)) for im in col])
-
-    return col
-
-
-def rgb2gray(rgb):
-    return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
-
-
-def flatten_set(image_set):
-    """
-    :param image_set as a 3 D numpy array : n_imagges x width x length
-    :return: image_set as a 2 D numpy array : n_images x (width x length)
-    """
-
-    return np.reshape(image_set, [image_set.shape[0], -1])
 
 
 def verify_input(_):
@@ -84,15 +53,10 @@ def main(_):
         window = MainWindow(FLAGS.image_dir, image_set, image_paths, FLAGS.clustering_method, FLAGS.architecture, FLAGS.pollution_dir,
                             FLAGS.pollution_percent)
         sys.exit(app.exec_())
-        # TODO : Wtf here ?
 
     elif FLAGS.processing == 'move':
-        if FLAGS.relocation_dir:
-            ensure_directory(FLAGS.relocation_dir)
-            move_images(FLAGS.relocation_dir, image_paths)
-        else:
-            # TODO : NEED TO KILL IT I.e si il a mit quelque chose
-            print('')
+        ensure_directory(FLAGS.relocation_dir)
+        move_images(FLAGS.relocation_dir, image_paths)
 
     elif FLAGS.processing == 'delete':
         delete_images(image_paths)

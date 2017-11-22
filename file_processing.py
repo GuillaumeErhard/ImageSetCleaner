@@ -7,22 +7,44 @@ def ensure_directory(path):
         os.mkdir(path)
 
 
+def get_all_images_path(image_dir):
+
+    return [os.path.join(image_dir, path) for path in os.listdir(image_dir)]
+
+
+def get_relevant_image_paths(all_paths, already_used, predictions):
+    """
+    A function that returns the paths of images detected, and not yet processed.
+    :param all_paths: Paths of all original, images
+    :param already_used: Paths of already processed images
+    :param predictions: The vector of predictions
+    :return: A list containing the paths of remaining detection
+    """
+
+    remaining_paths = []
+    for idx, prediction in enumerate(predictions):
+        if prediction and not all_paths[idx] in already_used:
+            remaining_paths.append(all_paths[idx])
+
+    return remaining_paths
+
+
 def get_image_paths(image_dir, predictions):
     """
-    A simple programm that will find the paths of the detected images.
+    A simple function that will find the paths of the detected images.
     :param image_dir: The location of the image directory.
     :param predictions: The vector of predictions
     :return: A list containing the paths to every images detected
     """
 
-    images_names = os.listdir(image_dir)
+    images_names = get_all_images_path(image_dir)
     image_paths = []
 
     if len(images_names) > len(predictions):
         raise AssertionError('More prediction than files found. Probably your directory has subdirectories.')
     for idx, prediction in enumerate(predictions):
         if prediction:
-            image_paths.append(os.path.join(image_dir, images_names[idx]))
+            image_paths.append(images_names[idx])
 
     return image_paths
 

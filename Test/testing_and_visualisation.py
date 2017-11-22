@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(0, '../')
 import numpy as np
-from Bottleneck import get_bottlenecks_values
-from ImageSetCleaner import detection_with_kmeans, detection_with_agglomaritve_clustering, detection_with_feature_agglo, \
+from bottleneck import get_bottlenecks_values
+from image_set_cleaner import detection_with_kmeans, detection_with_agglomaritve_clustering, detection_with_feature_agglo, \
     detection_with_birch, semi_supervised_detection
 import matplotlib.pyplot as plt
 import time

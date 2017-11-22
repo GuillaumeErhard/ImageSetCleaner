@@ -1,7 +1,6 @@
 import numpy as np
 import os
 from sklearn import cluster
-from Bottleneck import get_bottlenecks_values
 
 
 # TODO: Mettre a jour
@@ -117,7 +116,6 @@ def grabbing_pollution(architecture, pollution_dir, pollution_points):
         pollution_bottlenecks = np.array()
         nb_bottlenecks_to_return = 0
     else:
-        print('Loading bottlenecks from :', path)
         pollution_bottlenecks = np.load(path)
 
         nb_bottlenecks = pollution_bottlenecks.shape[0]
@@ -162,6 +160,7 @@ def semi_supervised_detection(image_set, clustering_method, architecture, pollut
     elif clustering_method == CLUSTERING_METHODS[3]:
         predictions = detection_with_agglomaritve_clustering(synthetic_set)
 
-    predictions = predictions[:-pollution_points]
+    if pollution_points > 0:
+        predictions = predictions[:-pollution_points]
 
     return predictions

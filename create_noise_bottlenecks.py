@@ -1,12 +1,8 @@
-from Bottleneck import get_bottlenecks_values
+from bottleneck import get_bottlenecks_values, ALL_ARCHITECTURES
+from file_processing import ensure_directory
 import os
 import numpy as np
 import argparse
-
-
-def ensure_directory(path):
-    if not os.path.exists(path):
-        os.mkdir(path)
 
 
 def create_noisy_bottlenecks(image_dir, bottleneck_destination, architecture_chosen='MobileNet_1.0_224',
@@ -25,20 +21,14 @@ def create_noisy_bottlenecks(image_dir, bottleneck_destination, architecture_cho
 
     ensure_directory(bottleneck_destination)
 
-    all_posibilities = ['inception_v3', 'mobilenet_1.0_224', 'mobilenet_1.0_192', 'mobilenet_1.0_160',
-                        'mobilenet_1.0_128'
-                        'mobilenet_0.75_224', 'mobilenet_0.75_192', 'mobilenet_0.75_160', 'mobilenet_0.75_128',
-                        'mobilenet_0.50_224', 'mobilenet_0.50_192', 'mobilenet_0.50_160', 'mobilenet_0.50_128',
-                        'mobilenet_0.25_224', 'mobilenet_0.25_192', 'mobilenet_0.25_160', 'mobilenet_0.25_128']
-
     if architecture_chosen == 'all':
-        architecture_cicle = all_posibilities
+        architecture_cycle = ALL_ARCHITECTURES
     else:
-        architecture_cicle = [architecture_chosen]
+        architecture_cycle = [architecture_chosen]
 
     saved_values = os.listdir(bottleneck_destination)
 
-    for current_architecture in architecture_cicle:
+    for current_architecture in architecture_cycle:
 
         entry = 'Noise' + '_' + current_architecture + '.npy'
 
@@ -52,7 +42,22 @@ def create_noisy_bottlenecks(image_dir, bottleneck_destination, architecture_cho
                   ', delete the file, or change location if you want a new one.')
 
 
+def verify_input(_):
+    """
+    This method will check the values given by the user.
+    :param _: Parser
+    :return: Nothing
+    """
+
+    if not os.path.exists(FLAGS.image_dir):
+        raise AssertionError('Image directory not found.')
+
+    if FLAGS.architecture not in ALL_ARCHITECTURES and not FLAGS.architecture == 'all':
+        raise AssertionError('Wrong architecture given.')
+
+
 def main(_):
+    verify_input(_)
     create_noisy_bottlenecks(FLAGS.image_dir, FLAGS.bottleneck_destination, FLAGS.architecture, FLAGS.model_dir)
 
 
@@ -61,7 +66,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--image_dir',
         type=str,
-        default='',
+        default=None,
         help="""\
         Path to folders of random images.\
         """
@@ -69,9 +74,9 @@ if __name__ == "__main__":
     parser.add_argument(
         '--bottleneck_destination',
         type=str,
-        default="./Cached_pollution/",
-        help = """\
-            Directory where you want the created noisy values to be stored.\
+        default='./Cached_pollution/',
+        help="""\
+            Directory where you want the computed noisy values to be stored.\
         """
     )
     parser.add_argument(
@@ -86,7 +91,9 @@ if __name__ == "__main__":
               pixel input images, while 'mobilenet_0.25_128_quantized' will choose a much
               less accurate, but smaller and faster network that's 920 KB on disk and
               takes 128x128 images. See https://research.googleblog.com/2017/06/mobilenets-open-source-models-for.html
-              for more information on Mobilenet.\
+              for more information on Mobilenet.
+
+              Type all if you want to cycle through all possibilities\
               """)
     parser.add_argument(
         '--model_dir',

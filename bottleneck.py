@@ -3,22 +3,23 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
-from datetime import datetime
-import hashlib
 import os.path
-import random
 import re
 import sys
 import tarfile
+from file_processing import get_all_images_path
 
 import numpy as np
 from six.moves import urllib
 import tensorflow as tf
 
-from tensorflow.python.framework import graph_util
-from tensorflow.python.framework import tensor_shape
 from tensorflow.python.platform import gfile
-from tensorflow.python.util import compat
+
+ALL_ARCHITECTURES = ['inception_v3', 'mobilenet_1.0_224', 'mobilenet_1.0_192', 'mobilenet_1.0_160',
+                     'mobilenet_1.0_128',
+                     'mobilenet_0.75_224', 'mobilenet_0.75_192', 'mobilenet_0.75_160', 'mobilenet_0.75_128',
+                     'mobilenet_0.50_224', 'mobilenet_0.50_192', 'mobilenet_0.50_160', 'mobilenet_0.50_128',
+                     'mobilenet_0.25_224', 'mobilenet_0.25_192', 'mobilenet_0.25_160', 'mobilenet_0.25_128']
 
 
 def create_model_info(architecture):
@@ -198,40 +199,6 @@ def create_model_graph_bis(model_info, model_dir):
     return graph, bottleneck_tensor, resized_input_tensor
 
 
-def sorted_nicely( l ):
-    """ Sort the given iterable in the way that humans expect."""
-    convert = lambda text: int(text) if text.isdigit() else text
-    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
-    return sorted(l, key = alphanum_key)
-
-
-def create_image_list(image_dir):
-    if not gfile.Exists(image_dir):
-        tf.logging.error("Image directory '" + image_dir + "' not found.")
-        return None
-
-    file_list = []
-    extensions = ['jpg', 'jpeg']
-
-    for extension in extensions:
-        file_glob = os.path.join(image_dir,  '*.' + extension)
-        file_list.extend(gfile.Glob(file_glob))
-
-    if len(file_list) < 20:
-        tf.logging.warning(
-            'WARNING: Folder has less than 20 images, which may cause issues.')
-
-    # TODO : Enlever sa
-    # print(file_list[0].split('\\')[2][:-4])
-    # print(file_list.sort(key=alphanum_key))
-    # print(file_list)
-    # print(sorted(file_list, key=lambda item: (int(item.partition(' ')[0])
-    #                            if item[0].isdigit() else float('inf'), item)))
-
-    # https://stackoverflow.com/questions/4289331/python-extract-numbers-from-a-string
-    return sorted_nicely(file_list)
-
-
 def add_jpeg_decoding(input_width, input_height, input_depth, input_mean,
                       input_std):
     """Adds operations that perform JPEG decoding and resizing to the graph..
@@ -257,6 +224,7 @@ def add_jpeg_decoding(input_width, input_height, input_depth, input_mean,
                                              resize_shape_as_int)
     offset_image = tf.subtract(resized_image, input_mean)
     mul_image = tf.multiply(offset_image, 1.0 / input_std)
+
     return jpeg_data, mul_image
 
 
@@ -283,6 +251,7 @@ def run_bottleneck_on_image(sess, image_data, image_data_tensor,
     bottleneck_values = sess.run(bottleneck_tensor,
                                  {resized_input_tensor: resized_input_values})
     bottleneck_values = np.squeeze(bottleneck_values)
+
     return bottleneck_values
 
 
@@ -304,7 +273,7 @@ def get_bottlenecks_values(image_dir, architecture='MobileNet_1.0_224', model_di
         create_model_graph_bis(model_info, model_dir))
 
     # Look at the folder structure, and create lists of all the images.
-    image_paths = create_image_list(image_dir)
+    image_paths = get_all_images_path(image_dir)
 
     bottlenecks = np.zeros((len(image_paths), model_info['bottleneck_tensor_size']))
 
