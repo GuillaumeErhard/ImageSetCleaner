@@ -4,7 +4,6 @@ from __future__ import print_function
 
 import argparse
 import os.path
-import re
 import sys
 import tarfile
 from file_processing import get_all_images_path

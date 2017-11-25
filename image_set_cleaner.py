@@ -98,7 +98,7 @@ if __name__ == '__main__':
         type=str,
         default=None,
         help="""\
-            Directory where you want the detected images to be moved.
+            Directory where you want the detected images to be moved.\
         """
     )
     parser.add_argument(
@@ -107,9 +107,10 @@ if __name__ == '__main__':
         default='MobileNet_1.0_224',
         help="""\
               Which model architecture to use. 'inception_v3' is the most accurate, but
-              also the slowest. For faster or smaller models, chose a MobileNet with the
-              form 'mobilenet_<parameter size>_<input_size>[_quantized]'. For example,
-              'mobilenet_1.0_224' will pick a model that is 17 MB in size and takes 224
+              also the slowest, and you might it the dimensionality curse with small sample, given the bottleneck layer
+              is the biggest. For faster results, chose a MobileNet with the form :
+              'mobilenet_<parameter size>_<input_size>[_quantized]'.
+              For example, 'mobilenet_1.0_224' will pick a model that is 17 MB in size and takes 224
               pixel input images, while 'mobilenet_0.25_128_quantized' will choose a much
               less accurate, but smaller and faster network that's 920 KB on disk and
               takes 128x128 images. See https://research.googleblog.com/2017/06/mobilenets-open-source-models-for.html

@@ -1,8 +1,9 @@
 import sys
 sys.path.insert(0, '../')
+import argparse
 import numpy as np
 from bottleneck import get_bottlenecks_values
-from image_set_cleaner import detection_with_kmeans, detection_with_agglomaritve_clustering, detection_with_feature_agglo, \
+from image_set_cleaner import detection_with_kmeans, detection_with_agglomaritve_clustering, detection_with_spectral_clustering, \
     detection_with_birch, semi_supervised_detection
 import matplotlib.pyplot as plt
 import time
@@ -82,8 +83,8 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
     spectral_fn_accumulator = np.zeros(nb_point_calculation)
     spectral_fp_accumulator = np.zeros(nb_point_calculation)
 
-    feature_agglo_fn_accumulator = np.zeros(nb_point_calculation)
-    feature_agglo_fp_accumulator = np.zeros(nb_point_calculation)
+    agglo_fn_accumulator = np.zeros(nb_point_calculation)
+    agglo_fp_accumulator = np.zeros(nb_point_calculation)
 
     birch_fn_accumulator = np.zeros(nb_point_calculation)
     birch_fp_accumulator = np.zeros(nb_point_calculation)
@@ -106,10 +107,10 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
         spectral_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / (nb_cat_bottlenecks + i) * 100
         spectral_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / (nb_cat_bottlenecks + i) * 100
 
-        predictions = detection_with_feature_agglo(image_set)
-        feature_agglo_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / (
+        predictions = detection_with_spectral_clustering(image_set)
+        agglo_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / (
             nb_cat_bottlenecks + i) * 100
-        feature_agglo_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / (
+        agglo_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / (
             nb_cat_bottlenecks + i) * 100
 
         predictions = detection_with_birch(image_set)
@@ -119,10 +120,10 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
     print("Finished to get predictions, generated in : ", time.time() - t0)
 
     plt.figure()
-
+    # TODO : Subplot ?
     line_k_means, = plt.plot(x_axis, k_means_fn_accumulator, 'ro')
     line_spectral, = plt.plot(x_axis, spectral_fn_accumulator, 'gx')
-    line_feature_agglo, = plt.plot(x_axis, feature_agglo_fn_accumulator, 'bs')
+    line_feature_agglo, = plt.plot(x_axis, agglo_fn_accumulator, 'bs')
     line_birch, = plt.plot(x_axis, birch_fn_accumulator, 'k^')
 
     plt.xlabel('% of pollution')
@@ -134,7 +135,7 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
 
     line_k_means, = plt.plot(x_axis, k_means_fp_accumulator, 'ro')
     line_spectral, = plt.plot(x_axis, spectral_fp_accumulator, 'gx')
-    line_feature_agglo, = plt.plot(x_axis, feature_agglo_fp_accumulator, 'bs')
+    line_feature_agglo, = plt.plot(x_axis, agglo_fp_accumulator, 'bs')
     line_birch, = plt.plot(x_axis, birch_fp_accumulator, 'k^')
 
     plt.xlabel('% of pollution')
@@ -142,46 +143,13 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
     plt.legend([line_k_means, line_spectral, line_feature_agglo, line_birch],
                ['k-means', 'Spectral Clustering', 'Feature Agglomeration', 'Birch'], loc='best')
 
-    #plt.show()
 
-
-def benchmark_spectral(main_label_bottlenekcs, pollution_labels_bottlenecks):
-    # TODO : Delete / refractor ?
-    """
-
-        :param main_label_bottlenekcs: Numpy array containing all the bottleneck values of your main label.
-        :param pollution_labels_bottlenecks:  Numpy array containing all the bottleneck values of your polution label.
-        :param architecture_chosen: Which model architecture to use. Ranging from the incepetion to the MobileNet model
-        :param model_location: Where the model will be downloaded
-        :return: Nothing. But will display graph, and info in the console
-        """
-
-    true_label = np.zeros(len(main_label_bottlenekcs))
-
-    nb_point_calculation = 10
-    steps_in_calculation = tuple(
-        int(len(pollution_labels_bottlenecks) / nb_point_calculation * i) for i in range(1, nb_point_calculation + 1))
-
-    tuned_parameters = {'affinity': ['cosine', 'l1', 'manhattan'], 'linkage' : ['complete', 'average']}
-    spectral = AgglomerativeClustering(n_clusters=2)
-    scorer = make_scorer(f1_score)
-
-    clf = GridSearchCV(spectral, tuned_parameters, scoring=scorer)
-
-    # Test with 5 % pollution
-    X = np.concatenate((main_label_bottlenekcs, pollution_labels_bottlenecks[: int(len(main_label_bottlenekcs) * 0.05), :]))
-    Y = np.concatenate((np.zeros(len(main_label_bottlenekcs)), np.ones(int(len(main_label_bottlenekcs) * 0.05))))
-    clf.fit(X, Y)
-
-    print(clf.best_params_)
-    print(clf.best_score_)
-
-
-def see_iso_map(bottlenecks, labels):
+def see_iso_map(bottlenecks, labels, suptitle=None):
     """
 
     :param bottlenecks:
     :param labels:
+    :param suptitle: String to add as plot suptitles
     :return: Nothing, will just plot a scatter plot to show the distribution of our data after dimensionality reduction.
     """
 
@@ -205,8 +173,10 @@ def see_iso_map(bottlenecks, labels):
     plt.title("Isomap projection")
 
     plt.subplot(222)
-    plt.scatter(B_lle[:start_index_outlier, 0], B_lle[:start_index_outlier, 1], marker='o', c='b', alpha=alpha_inlier)
-    plt.scatter(B_lle[start_index_outlier:, 0], B_lle[start_index_outlier:, 1], marker='^', c='k')
+    inlier_scatter = plt.scatter(B_lle[:start_index_outlier, 0], B_lle[:start_index_outlier, 1], marker='o', c='b',
+                                 alpha=alpha_inlier)
+    outlier_scatter = plt.scatter(B_lle[start_index_outlier:, 0], B_lle[start_index_outlier:, 1], marker='^', c='k')
+    plt.legend([inlier_scatter, outlier_scatter], ['Inliers', 'Outliers'], loc='lower left')
     plt.title("Locally Linear Embedding")
 
     plt.subplot(223)
@@ -219,42 +189,9 @@ def see_iso_map(bottlenecks, labels):
     plt.scatter(B_spec[start_index_outlier:, 0], B_spec[start_index_outlier:, 1], marker='^', c='k')
     plt.title("Spectral embedding")
 
-    plt.show()
+    if suptitle:
+        plt.suptitle(suptitle)
 
-
-def semi_supervised(main_label, pollution_labels, synthetic_pollution):
-    """
-        This function is to test my hypothesis, given, the graph that we need a minimum of pollution, to have better result.
-        So we will add fake pollution for our classifier, and take them out afterward.
-
-    :param main_label: Numpy array containing all the bottleneck values of your main label.
-    :param pollution_labels: Numpy array containing all the bottleneck values of your polution label.
-    :param synthetic_pollution: Numpy array containing synthetic pollution, that will be as random as possible
-    :return: Nothing. But will display graph, and info in the console
-    """
-    print('TODO')
-
-
-def semi_supervised_unit():
-    """
-        Use of group of image, from google image search that have been labeled
-    :return: Nothing will just print the result
-    """
-    dir_location = ['./Test_cluster_no_outlier/', './Test_cluster_small/', './Test_cluster_1/', './Test_cluster_2/']
-    ground_true = [np.zeros(75), np.array([0, 0, 0, 0, 1, 1, 0, 1, 0, 0]), np.concatenate([[1, 1, 1, 1], np.zeros(52)]),
-                   np.concatenate([np.zeros(82), [1, 1, 1, 1, 1]])]
-
-    # classifiers = ('kmeans', 'birch', 'feature_agglo', 'agglomerative')
-    classifiers = ('kmeans', 'birch', 'agglomerative')
-    for idx, dir in enumerate(dir_location):
-        # TODO : Classifier feature agllo ne marche pas. Il fait par le vecteur de plus grand taille au lieu du premier. Breaks
-        print('Cluster :', dir)
-        for clf in classifiers:
-            predictions = semi_supervised_detection(dir, clf, 'MobileNet_1.0_224', '../model', '../Cached_pollution')
-            accuracy, precision, recall = get_scoring(ground_true[idx], predictions)
-            print(clf, 'Accuracy', accuracy, 'Precision :', precision, 'Recall', recall)
-
-        #print(predictions.shape)
 
 
 def load_bottleneck(image_dir, bottlenick_dir, architecture_chosen='MobileNet_1.0_224', model_location='../model'):
@@ -369,42 +306,68 @@ def see_false_negative(image_set, predictions, ground_truth):
     stich_images((width_images, height_images), false_negatives[sent_images:])
 
 
-def main():
+def main(_):
+
+    # Just add your own labels, with distinct diretory and update; the variables
     image_dir = ['./Cat', './Dog', './Flag', './Noise']
-    # plt.ion()
-    bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks')
 
-    # benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
-    # benchmark_one_class_poluted(bottlenecks['Flag'], bottlenecks['Noise'])
-    #bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks', architecture_chosen = 'inception_v3')
-    #
-    # benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
+    bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks', architecture_chosen=FLAGS.architecture)
 
-    # benchmark_spectral(bottlenecks['Cat'], bottlenecks['Dog'])
+    if FLAGS.test == "benchmark":
 
-    plt.show()
-    # # TODO : Test this, need le label tho
-    # Close label test
-    X = np.concatenate((bottlenecks['Cat'], bottlenecks['Dog'][: int(len(bottlenecks['Dog']) * 0.05), :]))
-    Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(int(len(bottlenecks['Dog']) * 0.05))))
-    see_iso_map(X, Y)
+        benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
+        benchmark_one_class_poluted(bottlenecks['Flag'], bottlenecks['Noise'])
 
-    # Label but noise to help
-    X = np.concatenate((bottlenecks['Dog'][: int(len(bottlenecks['Dog']) * 0.05), :], bottlenecks['Noise']))
-    X = np.concatenate((bottlenecks['Cat'], X))
-    Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(int(len(bottlenecks['Dog']) * 0.05) + int(len(bottlenecks['Noise'])))))
-    see_iso_map(X, Y)
+        plt.show()
 
+    if FLAGS.test == "isomap":
+        # Close label test
+        X = np.concatenate((bottlenecks['Cat'], bottlenecks['Dog'][: int(len(bottlenecks['Cat']) * 0.05), :]))
+        Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(int(len(bottlenecks['Dog']) * 0.05))))
+        see_iso_map(X, Y, 'Cat labels, with 5 % of dog pictures.')
 
-    X = np.concatenate((bottlenecks['Cat'], bottlenecks['Noise']))
-    Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(len(bottlenecks['Noise']) )))
-    see_iso_map(X, Y)
-    #
-    # plt.show()
+        # Label but noise to help
+        X = np.concatenate((bottlenecks['Dog'][: int(len(bottlenecks['Dog']) * 0.05), :], bottlenecks['Noise']))
+        X = np.concatenate((bottlenecks['Cat'], X))
+        Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(int(len(bottlenecks['Dog']) * 0.05) + int(len(bottlenecks['Noise'])))))
+        see_iso_map(X, Y, 'Cat labels, with 5 % of Dog Noise and 15 % of Random Images')
 
-    #semi_supervised_unit()
+        X = np.concatenate((bottlenecks['Cat'], bottlenecks['Noise']))
+        Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(len(bottlenecks['Noise']) )))
+        see_iso_map(X, Y, 'Cat labels, with 15 % of Random Images')
 
-    # see_false_negative(detection_with_kmeans())
+        plt.show()
+
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--test',
+        type=str,
+        default='',
+        help="""\
+           Wich test you want to be executed.
+           Either :
+           - isomap
+           - benchmark\
+           """
+    )
+    parser.add_argument(
+        '--architecture',
+        type=str,
+        default='MobileNet_1.0_224',
+        help="""\
+                  Which model architecture to use. 'inception_v3' is the most accurate, but
+                  also the slowest, and you might it the dimensionality curse with small sample, given the bottleneck layer
+                  is the biggest. For faster results, chose a MobileNet with the form :
+                  'mobilenet_<parameter size>_<input_size>[_quantized]'.
+                  For example, 'mobilenet_1.0_224' will pick a model that is 17 MB in size and takes 224
+                  pixel input images, while 'mobilenet_0.25_128_quantized' will choose a much
+                  less accurate, but smaller and faster network that's 920 KB on disk and
+                  takes 128x128 images. See https://research.googleblog.com/2017/06/mobilenets-open-source-models-for.html
+                  for more information on Mobilenet.\
+                  """)
+
+    FLAGS, unparsed = parser.parse_known_args()
+    main(FLAGS)
+

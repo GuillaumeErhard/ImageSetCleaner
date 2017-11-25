@@ -12,7 +12,7 @@ def create_noisy_bottlenecks(image_dir, bottleneck_destination, architecture_cho
 
     :param image_dir: List of image dir location you want to test with
     :param bottleneck_destination: Where you want your bottleneck to be saved
-    :param architecture_chosen: Which model architecture to use to generate your bottlenecks.
+    :param architecture_chosen: Which architecture to use to generate your bottlenecks.
             Ranging from the inception to the MobileNet models
             Type 'all' if you want to cycle through all possibilities
     :param model_location: Where the model will be downloaded

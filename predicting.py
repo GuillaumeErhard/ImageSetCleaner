@@ -4,7 +4,7 @@ from sklearn import cluster
 
 
 # TODO: Mettre a jour
-CLUSTERING_METHODS = ('kmeans', 'birch', 'feature_agglo', 'agglomerative')
+CLUSTERING_METHODS = ('kmeans', 'birch', 'spectral_clustering', 'agglomerative')
 
 
 def normalize_predictions(predictions):
@@ -22,33 +22,12 @@ def normalize_predictions(predictions):
     return predictions
 
 
-def detection_with_agglomaritve_clustering(image_set):
-    """
-    Really good if the classes you are analyzing are close to what the network learned.
-
-    :param image_set
-    :return: predictions vector
-
-     N.B : The detector breaks with a full black image.
-    """
-
-    # http://scikit-learn.org/stable/auto_examples/cluster/plot_agglomerative_clustering.html#sphx-glr-auto-examples-cluster-plot-agglomerative-clustering-py
-    clf = cluster.AgglomerativeClustering(n_clusters=2)
-
-    clf.fit(image_set)
-
-    predictions = clf.labels_
-    predictions = normalize_predictions(predictions)
-
-    return predictions
-
-
 def detection_with_kmeans(image_set):
     """
     Fast, but might not be able to map great for nonlinear separation of classes.
 
-    :param image_set
-    :return: predictions vector
+    :param image_set: The bottleneck values of the relevant images.
+    :return: Predictions vector
     """
 
     clf = cluster.KMeans(n_clusters=2, random_state=42)
@@ -61,28 +40,11 @@ def detection_with_kmeans(image_set):
     return predictions
 
 
-def detection_with_feature_agglo(image_set):
-    """
-
-    :param image_set:
-    :return: predictions vector
-    """
-
-    clf = cluster.SpectralClustering(n_clusters=2, random_state=42, eigen_solver='arpack')
-
-    clf.fit(image_set)
-
-    predictions = clf.labels_
-    predictions = normalize_predictions(predictions)
-
-    return predictions
-
-
 def detection_with_birch(image_set):
     """
 
-    :param image_set:
-    :return: predictions vector
+    :param image_set: The bottleneck values of the relevant images.
+    :return: Predictions vector
     """
 
     clf = cluster.Birch(n_clusters=2)
@@ -95,12 +57,51 @@ def detection_with_birch(image_set):
     return predictions
 
 
-def grabbing_pollution(architecture, pollution_dir, pollution_points):
-    # TODO Complete architecture
+def detection_with_spectral_clustering(image_set):
     """
 
-    :param architecture:
-    :param pollution_dir: Location of the directory containing the precomputed values.
+    :param image_set: The bottleneck values of the relevant images.
+    :return: Predictions vector
+    """
+
+    clf = cluster.SpectralClustering(n_clusters=2, random_state=42, eigen_solver='arpack')
+
+    clf.fit(image_set)
+
+    predictions = clf.labels_
+    predictions = normalize_predictions(predictions)
+
+    return predictions
+
+
+def detection_with_agglomaritve_clustering(image_set):
+    """
+    Really good if the classes you are analyzing are close to what the network learned.
+
+    :param image_set: The bottleneck values of the relevant images.
+    :return: Predictions vector
+
+     N.B : The detector breaks with a full black image.
+    """
+
+    # http://scikit-learn.org/stable/auto_examples/cluster/plot_agglomerative_clustering.html#sphx-glr-auto-examples-cluster-plot-agglomerative-clustering-py
+    clf = cluster.AgglomerativeClustering(n_clusters=2, affinity="l2", linkage="complete")
+
+    clf.fit(image_set)
+
+    predictions = clf.labels_
+    predictions = normalize_predictions(predictions)
+
+    return predictions
+
+
+def grabbing_pollution(architecture, pollution_dir, pollution_points):
+    """
+    This function that will see if the pollution directory exist, and try to look a .npy file following the right naming
+    scheme.
+
+    :param architecture: Which architecture to use to generate your bottlenecks.
+    :param pollution_dir: Location of the directory containing precomputed values for random images.
     :param pollution_points: Number of points desired by the user to be added to the data values.
     :return: An int that contains how many pollution bottleneck we have and a numpy array containing, bottlencks of
             random images.
@@ -133,13 +134,14 @@ def grabbing_pollution(architecture, pollution_dir, pollution_points):
 
 def semi_supervised_detection(image_set, clustering_method, architecture, pollution_dir,
                               pollution_percent=0.20):
-    # TODO : Compléter commentaire des deux fonctions
     """
+    This function will assemble the values of the image directory, and from random images, to perform a clustering
+    on those, and will return the predictions, only on image bottlenecks.
 
-    :param image_set: The bottleneck values of the examined images?
+    :param image_set: The bottleneck values of the relevant images.
     :param clustering_method: Which algorithm is used to get a prediction on the data.
-    :param architecture:
-    :param pollution_dir:
+    :param architecture: Which architecture to use to generate your bottlenecks.
+    :param pollution_dir: Location of the directory containing precomputed values for random images.
     :param pollution_percent: Fraction of pollution added to our image values.
     :return: A prediction vector, that is altered by a given amount of random data, to hopefuly get a better performance.
     """
@@ -156,7 +158,7 @@ def semi_supervised_detection(image_set, clustering_method, architecture, pollut
     elif clustering_method == CLUSTERING_METHODS[1]:
         predictions = detection_with_birch(synthetic_set)
     elif clustering_method == CLUSTERING_METHODS[2]:
-        predictions = detection_with_feature_agglo(synthetic_set)
+        predictions = detection_with_spectral_clustering(synthetic_set)
     elif clustering_method == CLUSTERING_METHODS[3]:
         predictions = detection_with_agglomaritve_clustering(synthetic_set)
 
