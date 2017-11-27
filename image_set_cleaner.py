@@ -96,7 +96,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--architecture',
         type=str,
-        default='MobileNet_1.0_224',
+        default='mobilenet_1.0_224',
         help="""\
               Which model architecture to use. 'inception_v3' is the most accurate, but
               also the slowest, and you might it the dimensionality curse with small sample, given the bottleneck layer

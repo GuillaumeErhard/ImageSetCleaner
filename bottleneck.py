@@ -254,7 +254,7 @@ def run_bottleneck_on_image(sess, image_data, image_data_tensor,
     return bottleneck_values
 
 
-def get_bottlenecks_values(image_dir, architecture='MobileNet_1.0_224', model_dir='./model/'):
+def get_bottlenecks_values(image_dir, architecture='mobilenet_1.0_224', model_dir='./model/'):
     # Needed to make sure the logging output is visible.
     # See https://github.com/tensorflow/tensorflow/issues/3047
     tf.logging.set_verbosity(tf.logging.INFO)
