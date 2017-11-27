@@ -76,10 +76,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '--clustering_method',
         type=str,
-        default='feature_agglo',
+        default='birch',
         help="""\
-            Choose your method of clustering, between k-means, mean_shift, agglomerattive clustering, birch
-            More info : http://scikit-learn.org/stable/modules/clustering.html\
+            Choose your method of clustering, between 'kmeans', 'birch', 'gaussian_mixture', 'agglomerative_clustering'\
             """
     )
     parser.add_argument(

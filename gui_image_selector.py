@@ -124,7 +124,6 @@ class MainWindow(QMainWindow):
 
         predictions = semi_supervised_detection(self.image_set, self.classifier_combo.currentText(), self.architecture,
                                                 self.pollution_dir, float(self.pollution_slider.value()) / 100)
-
         image_paths = get_relevant_image_paths(self.all_paths, self.paths_processed, predictions)
 
         self.window = Window(image_paths)

@@ -3,25 +3,21 @@ sys.path.insert(0, '../')
 import argparse
 import numpy as np
 from bottleneck import get_bottlenecks_values
-from image_set_cleaner import detection_with_kmeans, detection_with_agglomaritve_clustering, detection_with_spectral_clustering, \
-    detection_with_birch, semi_supervised_detection
+from image_set_cleaner import detection_with_kmeans, detection_with_agglomaritve_clustering, detection_with_gaussian_mixture, \
+    detection_with_birch
 import matplotlib.pyplot as plt
 import time
 import os
 import warnings
 import tkinter as tk
 from PIL import Image
-from sklearn.cluster import AgglomerativeClustering
-from sklearn.grid_search import  GridSearchCV
-from sklearn.metrics import f1_score, make_scorer
-from sklearn.metrics import accuracy_score, precision_score, recall_score
+from sklearn.metrics import accuracy_score, precision_score
 from sklearn import decomposition
 from sklearn import manifold
 
 
 def get_nb_false_negative(ground_truth, predictions):
     nb_false_neg = 0
-
     for idx, pred in enumerate(predictions):
         if pred == 0 and ground_truth[idx] == 1:
             nb_false_neg += 1
@@ -57,7 +53,7 @@ def get_scoring(ground_truth, predictions):
     return accuracy, precision, recall
 
 
-def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenecks):
+def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenecks, suptitle=None):
     """
 
     :param main_label_bottlenecks: Numpy array containing all the bottleneck values of your main label.
@@ -80,14 +76,14 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
     k_means_fn_accumulator = np.zeros(nb_point_calculation)
     k_means_fp_accumulator = np.zeros(nb_point_calculation)
 
-    spectral_fn_accumulator = np.zeros(nb_point_calculation)
-    spectral_fp_accumulator = np.zeros(nb_point_calculation)
-
-    agglo_fn_accumulator = np.zeros(nb_point_calculation)
-    agglo_fp_accumulator = np.zeros(nb_point_calculation)
-
     birch_fn_accumulator = np.zeros(nb_point_calculation)
     birch_fp_accumulator = np.zeros(nb_point_calculation)
+
+    gaussian_mixture_fn_accumulator = np.zeros(nb_point_calculation)
+    gaussian_mixture_fp_accumulator = np.zeros(nb_point_calculation)
+
+    agglomerative_fn_accumulator = np.zeros(nb_point_calculation)
+    agglomerative_fp_accumulator = np.zeros(nb_point_calculation)
 
     nb_cat_bottlenecks = len(main_label_bottlenecks)
     x_axis = [x / (nb_cat_bottlenecks + len(polution_label_bottlenecks)) * 100 for x in
@@ -96,52 +92,54 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
     t0 = time.time()
 
     for idx, i in enumerate(steps_in_calculation):
-        ground_true = np.concatenate([true_label, np.ones(i + 1)])
+        ground_true = np.concatenate([true_label, np.ones(i)])
         image_set = np.concatenate((main_label_bottlenecks, polution_label_bottlenecks[:i]))
 
         predictions = detection_with_kmeans(image_set)
-        k_means_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / (nb_cat_bottlenecks + i) * 100
-        k_means_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / (nb_cat_bottlenecks + i) * 100
-
-        predictions = detection_with_agglomaritve_clustering(image_set)
-        spectral_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / (nb_cat_bottlenecks + i) * 100
-        spectral_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / (nb_cat_bottlenecks + i) * 100
-
-        predictions = detection_with_spectral_clustering(image_set)
-        agglo_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / (
-            nb_cat_bottlenecks + i) * 100
-        agglo_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / (
-            nb_cat_bottlenecks + i) * 100
+        nb_points = len(predictions)
+        k_means_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / nb_points * 100
+        k_means_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / nb_points * 100
 
         predictions = detection_with_birch(image_set)
-        birch_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / (nb_cat_bottlenecks + i) * 100
-        birch_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / (nb_cat_bottlenecks + i) * 100
+        birch_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / nb_points * 100
+        birch_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / nb_points * 100
+
+        predictions = detection_with_gaussian_mixture(image_set)
+        gaussian_mixture_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / nb_points * 100
+        gaussian_mixture_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / nb_points * 100
+
+        predictions = detection_with_agglomaritve_clustering(image_set)
+        agglomerative_fn_accumulator[idx] = get_nb_false_negative(ground_true, predictions) / nb_points * 100
+        agglomerative_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / nb_points * 100
 
     print("Finished to get predictions, generated in : ", time.time() - t0)
 
     plt.figure()
-    # TODO : Subplot ?
+    plt.subplot(121)
+
     line_k_means, = plt.plot(x_axis, k_means_fn_accumulator, 'ro')
-    line_spectral, = plt.plot(x_axis, spectral_fn_accumulator, 'gx')
-    line_feature_agglo, = plt.plot(x_axis, agglo_fn_accumulator, 'bs')
     line_birch, = plt.plot(x_axis, birch_fn_accumulator, 'k^')
+    line_gaussian, = plt.plot(x_axis, gaussian_mixture_fn_accumulator, 'bs')
+    line_agglomerative, = plt.plot(x_axis, agglomerative_fn_accumulator, 'gx')
 
     plt.xlabel('% of pollution')
     plt.ylabel('% of false positive')
-    plt.legend([line_k_means, line_spectral, line_feature_agglo, line_birch],
-               ['k-means', 'Spectral Clustering', 'Feature Agglomeration', 'Birch'], loc='best')
+    plt.legend([line_k_means, line_birch, line_gaussian, line_agglomerative],
+               ['K-means', 'Birch', 'Gaussian Mixture', 'Agglomerative Clustering'], loc='best')
 
-    plt.figure()
-
+    plt.subplot(122)
     line_k_means, = plt.plot(x_axis, k_means_fp_accumulator, 'ro')
-    line_spectral, = plt.plot(x_axis, spectral_fp_accumulator, 'gx')
-    line_feature_agglo, = plt.plot(x_axis, agglo_fp_accumulator, 'bs')
+    line_agglomerative, = plt.plot(x_axis, agglomerative_fp_accumulator, 'gx')
+    line_gaussian, = plt.plot(x_axis, gaussian_mixture_fp_accumulator, 'bs')
     line_birch, = plt.plot(x_axis, birch_fp_accumulator, 'k^')
 
     plt.xlabel('% of pollution')
     plt.ylabel('% of false negative')
-    plt.legend([line_k_means, line_spectral, line_feature_agglo, line_birch],
-               ['k-means', 'Spectral Clustering', 'Feature Agglomeration', 'Birch'], loc='best')
+    plt.legend([line_k_means, line_birch, line_gaussian, line_agglomerative],
+               ['K-means', 'Birch', 'Gaussian Mixture', 'Agglomerative Clustering'], loc='best')
+
+    if suptitle:
+        plt.suptitle(suptitle)
 
 
 def see_iso_map(bottlenecks, labels, suptitle=None):
@@ -191,7 +189,6 @@ def see_iso_map(bottlenecks, labels, suptitle=None):
 
     if suptitle:
         plt.suptitle(suptitle)
-
 
 
 def load_bottleneck(image_dir, bottlenick_dir, architecture_chosen='MobileNet_1.0_224', model_location='../model'):
@@ -308,15 +305,16 @@ def see_false_negative(image_set, predictions, ground_truth):
 
 def main(_):
 
-    # Just add your own labels, with distinct diretory and update; the variables
+    # Just add your own labels, with distinct directory and update; the variables
     image_dir = ['./Cat', './Dog', './Flag', './Noise']
 
     bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks', architecture_chosen=FLAGS.architecture)
 
     if FLAGS.test == "benchmark":
 
-        benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'])
-        benchmark_one_class_poluted(bottlenecks['Flag'], bottlenecks['Noise'])
+        benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'], 'Cat labels, polluted by random images')
+        benchmark_one_class_poluted(bottlenecks['Flag'], bottlenecks['Noise'], 'Flag labels, polluted by random images')
+        benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Dog'], 'Cat labels, polluted by dog images')
 
         plt.show()
 

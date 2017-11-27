@@ -1,10 +1,10 @@
 import numpy as np
 import os
 from sklearn import cluster
+from sklearn import mixture
 
 
-# TODO: Mettre a jour
-CLUSTERING_METHODS = ('kmeans', 'birch', 'spectral_clustering', 'agglomerative')
+CLUSTERING_METHODS = ('kmeans', 'birch', 'gaussian_mixture', 'agglomerative_clustering')
 
 
 def normalize_predictions(predictions):
@@ -30,7 +30,7 @@ def detection_with_kmeans(image_set):
     :return: Predictions vector
     """
 
-    clf = cluster.KMeans(n_clusters=2, random_state=42)
+    clf = cluster.KMeans(n_clusters=2)
 
     clf.fit(image_set)
 
@@ -47,6 +47,7 @@ def detection_with_birch(image_set):
     :return: Predictions vector
     """
 
+    # The branching_factor, might be fine tune for better results
     clf = cluster.Birch(n_clusters=2)
 
     clf.fit(image_set)
@@ -57,18 +58,19 @@ def detection_with_birch(image_set):
     return predictions
 
 
-def detection_with_spectral_clustering(image_set):
+def detection_with_gaussian_mixture(image_set):
     """
 
     :param image_set: The bottleneck values of the relevant images.
     :return: Predictions vector
     """
 
-    clf = cluster.SpectralClustering(n_clusters=2, random_state=42, eigen_solver='arpack')
+    # Might achieve, better results by initializing weights, or means, given we know when we introduce noisy labels
+    clf = mixture.GaussianMixture(n_components=2)
 
     clf.fit(image_set)
 
-    predictions = clf.labels_
+    predictions = clf.predict(image_set)
     predictions = normalize_predictions(predictions)
 
     return predictions
@@ -158,7 +160,7 @@ def semi_supervised_detection(image_set, clustering_method, architecture, pollut
     elif clustering_method == CLUSTERING_METHODS[1]:
         predictions = detection_with_birch(synthetic_set)
     elif clustering_method == CLUSTERING_METHODS[2]:
-        predictions = detection_with_spectral_clustering(synthetic_set)
+        predictions = detection_with_gaussian_mixture(synthetic_set)
     elif clustering_method == CLUSTERING_METHODS[3]:
         predictions = detection_with_agglomaritve_clustering(synthetic_set)
 
