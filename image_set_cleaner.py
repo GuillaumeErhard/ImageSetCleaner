@@ -6,13 +6,6 @@ from predicting import *
 from file_processing import *
 from bottleneck import get_bottlenecks_values
 
-# Check :
-# https://machinelearningmastery.com/how-to-identify-outliers-in-your-data/
-# http://scikit-learn.org/stable/auto_examples/covariance/plot_outlier_detection.html#sphx-glr-auto-examples-covariance-plot-outlier-detection-py
-
-# http://www.sciencedirect.com/science/article/pii/S0167947307002204
-# https://www.researchgate.net/publication/224576812_Using_one-class_SVM_outliers_detection_for_verification_of_collaboratively_tagged_image_training_sets
-
 
 def verify_input(_):
     """
@@ -130,7 +123,7 @@ if __name__ == '__main__':
         type=str,
         default='./Cached_pollution',
         help="""\
-        Path to cached pollution bottlenecks.\
+        Path to the directory containing cached pollution bottlenecks.\
         """
     )
     parser.add_argument(

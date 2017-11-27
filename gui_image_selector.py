@@ -1,7 +1,6 @@
-import sys
 from PyQt5 import QtCore
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QWidget, QApplication, QGridLayout, QLabel, QScrollArea, QAction, \
+from PyQt5.QtWidgets import QWidget, QGridLayout, QLabel, QScrollArea, QAction, \
     QMainWindow, QStyle, qApp, QFileDialog, QSlider, QComboBox, QPushButton
 from file_processing import *
 from predicting import *
