@@ -171,22 +171,22 @@ def benchmark_semi_supervised(main_label_bottlenecks, polution_label_bottlenecks
         polution_label_bottlenecks = polution_label_bottlenecks[len(main_label_bottlenecks)-1, :]
 
     nb_outliers = len(polution_label_bottlenecks)
-    ground_true = np.concatenate((np.ones(len(main_label_bottlenecks)), np.zeros(len(polution_label_bottlenecks))))
+    ground_true = np.concatenate((np.zeros(len(main_label_bottlenecks)), np.ones(len(polution_label_bottlenecks))))
     image_set = np.concatenate((main_label_bottlenecks, polution_label_bottlenecks))
 
     nb_point_calculation = 20
     steps_in_calculation = np.linspace(0, .40, nb_point_calculation)
 
-    k_means_fn_accumulator = np.zeros(nb_point_calculation)
+    k_means_tp_accumulator = np.zeros(nb_point_calculation)
     k_means_fp_accumulator = np.zeros(nb_point_calculation)
 
-    birch_fn_accumulator = np.zeros(nb_point_calculation)
+    birch_tp_accumulator = np.zeros(nb_point_calculation)
     birch_fp_accumulator = np.zeros(nb_point_calculation)
 
-    gaussian_mixture_fn_accumulator = np.zeros(nb_point_calculation)
+    gaussian_mixture_tp_accumulator = np.zeros(nb_point_calculation)
     gaussian_mixture_fp_accumulator = np.zeros(nb_point_calculation)
 
-    agglomerative_fn_accumulator = np.zeros(nb_point_calculation)
+    agglomerative_tp_accumulator = np.zeros(nb_point_calculation)
     agglomerative_fp_accumulator = np.zeros(nb_point_calculation)
 
     t0 = time.time()
@@ -198,34 +198,33 @@ def benchmark_semi_supervised(main_label_bottlenecks, polution_label_bottlenecks
     for idx, i in enumerate(steps_in_calculation):
 
         predictions = semi_supervised_detection(image_set, CLUSTERING_METHODS[0], architecture, pollution_dir, i)
-        k_means_fn_accumulator[idx] = get_nb_outliers_found(ground_true, predictions) / nb_outliers * 100
+        k_means_tp_accumulator[idx] = get_nb_outliers_found(ground_true, predictions) / nb_outliers * 100
         k_means_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / nb_points * 100
 
         predictions = semi_supervised_detection(image_set, CLUSTERING_METHODS[1], architecture, pollution_dir, i)
-        birch_fn_accumulator[idx] = get_nb_outliers_found(ground_true, predictions) / nb_outliers * 100
+        birch_tp_accumulator[idx] = get_nb_outliers_found(ground_true, predictions) / nb_outliers * 100
         birch_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / nb_points * 100
 
         predictions = semi_supervised_detection(image_set, CLUSTERING_METHODS[2], architecture, pollution_dir, i)
-        gaussian_mixture_fn_accumulator[idx] = get_nb_outliers_found(ground_true, predictions) / nb_outliers * 100
+        gaussian_mixture_tp_accumulator[idx] = get_nb_outliers_found(ground_true, predictions) / nb_outliers * 100
         gaussian_mixture_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / nb_points * 100
 
         predictions = semi_supervised_detection(image_set, CLUSTERING_METHODS[3], architecture, pollution_dir, i)
-        agglomerative_fn_accumulator[idx] = get_nb_outliers_found(ground_true, predictions) / nb_outliers * 100
+        agglomerative_tp_accumulator[idx] = get_nb_outliers_found(ground_true, predictions) / nb_outliers * 100
         agglomerative_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / nb_points * 100
 
     print("Finished to get predictions, generated in : ", time.time() - t0)
 
+    # To get back percent
+    steps_in_calculation = steps_in_calculation * 100
+
     plt.figure()
     plt.subplot(121)
 
-    line_k_means, = plt.plot(steps_in_calculation, k_means_fn_accumulator, 'ro')
-    line_birch, = plt.plot(steps_in_calculation, birch_fn_accumulator, 'k^')
-    line_gaussian, = plt.plot(steps_in_calculation, gaussian_mixture_fn_accumulator, 'bs')
-    line_agglomerative, = plt.plot(steps_in_calculation, agglomerative_fn_accumulator, 'gx')
-
-    # y=x reference
-    max_polution = steps_in_calculation[-1] / nb_points * 100
-    plt.plot([0, max_polution], [0, max_polution])
+    line_k_means, = plt.plot(steps_in_calculation, k_means_tp_accumulator, 'ro')
+    line_birch, = plt.plot(steps_in_calculation, birch_tp_accumulator, 'k^')
+    line_gaussian, = plt.plot(steps_in_calculation, gaussian_mixture_tp_accumulator, 'bs')
+    line_agglomerative, = plt.plot(steps_in_calculation, agglomerative_tp_accumulator, 'gx')
 
     plt.xlabel('% of added noise')
     plt.ylabel('% of outliers found')
@@ -427,7 +426,14 @@ def main(_):
         benchmark_semi_supervised(bottlenecks['Flag'], bottlenecks['Noise'][: int(len(bottlenecks['Flag']) * 0.05), :],
                                   suptitle='Flag labels, with 5 % of random images')
 
+        benchmark_semi_supervised(bottlenecks['Cat'], bottlenecks['Dog'][: int(len(bottlenecks['Cat']) * 0.1), :],
+                                  suptitle='Cat labels, with 10 % of dog images.')
+
+        benchmark_semi_supervised(bottlenecks['Cat'], bottlenecks['Noise'][: int(len(bottlenecks['Cat']) * 0.05), :],
+                                  suptitle='Cat labels, with 5 % of random images.')
+
         plt.show()
+
     elif FLAGS.test == "isomap":
         # Close label test
         X = np.concatenate((bottlenecks['Cat'], bottlenecks['Dog'][: int(len(bottlenecks['Cat']) * 0.05), :]))
