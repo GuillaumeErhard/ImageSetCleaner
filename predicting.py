@@ -142,7 +142,7 @@ def semi_supervised_detection(image_set, clustering_method, architecture, pollut
 
     :param image_set: The bottleneck values of the relevant images.
     :param clustering_method: Which algorithm is used to get a prediction on the data.
-    :param architecture: Which architecture to use to generate your bottlenecks.
+    :param architecture: Which architecture used to generate your bottlenecks.
     :param pollution_dir: Location of the directory containing precomputed values for random images.
     :param pollution_percent: Fraction of pollution added to our image values.
     :return: A prediction vector, that is altered by a given amount of random data, to hopefuly get a better performance.

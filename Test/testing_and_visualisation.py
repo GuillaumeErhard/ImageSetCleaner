@@ -3,8 +3,7 @@ sys.path.insert(0, '../')
 import argparse
 import numpy as np
 from bottleneck import get_bottlenecks_values
-from image_set_cleaner import detection_with_kmeans, detection_with_agglomaritve_clustering, detection_with_gaussian_mixture, \
-    detection_with_birch
+from predicting import *
 import matplotlib.pyplot as plt
 import time
 import os
@@ -35,6 +34,16 @@ def get_nb_false_positive(ground_truth, predictions):
     return nb_false_pos
 
 
+def get_nb_outliers_found(ground_truth, predictions):
+    nb_outliers_found = 0
+
+    for idx, pred in enumerate(predictions):
+        if pred == 1 and ground_truth[idx] == 1:
+            nb_outliers_found += 1
+
+    return nb_outliers_found
+
+
 def get_nb_outlier(ground_truth):
     return np.sum(ground_truth)
 
@@ -58,8 +67,7 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
 
     :param main_label_bottlenecks: Numpy array containing all the bottleneck values of your main label.
     :param polution_label_bottlenecks: Numpy array containing all the bottleneck values of your polution label.
-    :param architecture_chosen: Which model architecture to use. Ranging from the incepetion to the MobileNet model
-    :param model_location: Where the model will be downloaded
+    :param suptitle: String to add as plot suptitles
     :return: Nothing. But will display graph
     """
 
@@ -122,8 +130,12 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
     line_gaussian, = plt.plot(x_axis, gaussian_mixture_fn_accumulator, 'bs')
     line_agglomerative, = plt.plot(x_axis, agglomerative_fn_accumulator, 'gx')
 
+    # y=x reference
+    max_polution = steps_in_calculation[-1] / nb_points * 100
+    plt.plot([0, max_polution], [0, max_polution])
+
     plt.xlabel('% of pollution')
-    plt.ylabel('% of false positive')
+    plt.ylabel('% of false negative')
     plt.legend([line_k_means, line_birch, line_gaussian, line_agglomerative],
                ['K-means', 'Birch', 'Gaussian Mixture', 'Agglomerative Clustering'], loc='best')
 
@@ -134,7 +146,100 @@ def benchmark_one_class_poluted(main_label_bottlenecks, polution_label_bottlenec
     line_birch, = plt.plot(x_axis, birch_fp_accumulator, 'k^')
 
     plt.xlabel('% of pollution')
-    plt.ylabel('% of false negative')
+    plt.ylabel('% of false positive')
+    plt.legend([line_k_means, line_birch, line_gaussian, line_agglomerative],
+               ['K-means', 'Birch', 'Gaussian Mixture', 'Agglomerative Clustering'], loc='best')
+
+    if suptitle:
+        plt.suptitle(suptitle)
+
+
+def benchmark_semi_supervised(main_label_bottlenecks, polution_label_bottlenecks, architecture='mobilenet_1.0_224',
+                              pollution_dir='../Cached_pollution', suptitle=None):
+    """
+
+    :param main_label_bottlenecks: Numpy array containing all the bottleneck values of your main label.
+    :param polution_label_bottlenecks: Numpy array containing all the bottleneck values of your polution label.
+    :param architecture: Which architecture used to generate your bottlenecks.
+    :param pollution_dir: Location of the directory containing precomputed values for random images.
+    :param suptitle: String to add as plot suptitles
+    :return: Nothing. But will display graph
+    """
+
+    if len(polution_label_bottlenecks) > len(main_label_bottlenecks):
+        warnings.warn('More polution label than true label, the array is truncated')
+        polution_label_bottlenecks = polution_label_bottlenecks[len(main_label_bottlenecks)-1, :]
+
+    nb_outliers = len(polution_label_bottlenecks)
+    ground_true = np.concatenate((np.ones(len(main_label_bottlenecks)), np.zeros(len(polution_label_bottlenecks))))
+    image_set = np.concatenate((main_label_bottlenecks, polution_label_bottlenecks))
+
+    nb_point_calculation = 20
+    steps_in_calculation = np.linspace(0, .40, nb_point_calculation)
+
+    k_means_fn_accumulator = np.zeros(nb_point_calculation)
+    k_means_fp_accumulator = np.zeros(nb_point_calculation)
+
+    birch_fn_accumulator = np.zeros(nb_point_calculation)
+    birch_fp_accumulator = np.zeros(nb_point_calculation)
+
+    gaussian_mixture_fn_accumulator = np.zeros(nb_point_calculation)
+    gaussian_mixture_fp_accumulator = np.zeros(nb_point_calculation)
+
+    agglomerative_fn_accumulator = np.zeros(nb_point_calculation)
+    agglomerative_fp_accumulator = np.zeros(nb_point_calculation)
+
+    t0 = time.time()
+
+    nb_points = len(image_set)
+
+    # Could be simplify and faster with another implementation of semi_supervised_detection that wouldn't rely
+    # on grabbing the .npy stored again and again
+    for idx, i in enumerate(steps_in_calculation):
+
+        predictions = semi_supervised_detection(image_set, CLUSTERING_METHODS[0], architecture, pollution_dir, i)
+        k_means_fn_accumulator[idx] = get_nb_outliers_found(ground_true, predictions) / nb_outliers * 100
+        k_means_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / nb_points * 100
+
+        predictions = semi_supervised_detection(image_set, CLUSTERING_METHODS[1], architecture, pollution_dir, i)
+        birch_fn_accumulator[idx] = get_nb_outliers_found(ground_true, predictions) / nb_outliers * 100
+        birch_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / nb_points * 100
+
+        predictions = semi_supervised_detection(image_set, CLUSTERING_METHODS[2], architecture, pollution_dir, i)
+        gaussian_mixture_fn_accumulator[idx] = get_nb_outliers_found(ground_true, predictions) / nb_outliers * 100
+        gaussian_mixture_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / nb_points * 100
+
+        predictions = semi_supervised_detection(image_set, CLUSTERING_METHODS[3], architecture, pollution_dir, i)
+        agglomerative_fn_accumulator[idx] = get_nb_outliers_found(ground_true, predictions) / nb_outliers * 100
+        agglomerative_fp_accumulator[idx] = get_nb_false_positive(ground_true, predictions) / nb_points * 100
+
+    print("Finished to get predictions, generated in : ", time.time() - t0)
+
+    plt.figure()
+    plt.subplot(121)
+
+    line_k_means, = plt.plot(steps_in_calculation, k_means_fn_accumulator, 'ro')
+    line_birch, = plt.plot(steps_in_calculation, birch_fn_accumulator, 'k^')
+    line_gaussian, = plt.plot(steps_in_calculation, gaussian_mixture_fn_accumulator, 'bs')
+    line_agglomerative, = plt.plot(steps_in_calculation, agglomerative_fn_accumulator, 'gx')
+
+    # y=x reference
+    max_polution = steps_in_calculation[-1] / nb_points * 100
+    plt.plot([0, max_polution], [0, max_polution])
+
+    plt.xlabel('% of added noise')
+    plt.ylabel('% of outliers found')
+    plt.legend([line_k_means, line_birch, line_gaussian, line_agglomerative],
+               ['K-means', 'Birch', 'Gaussian Mixture', 'Agglomerative Clustering'], loc='best')
+
+    plt.subplot(122)
+    line_k_means, = plt.plot(steps_in_calculation, k_means_fp_accumulator, 'ro')
+    line_agglomerative, = plt.plot(steps_in_calculation, agglomerative_fp_accumulator, 'gx')
+    line_gaussian, = plt.plot(steps_in_calculation, gaussian_mixture_fp_accumulator, 'bs')
+    line_birch, = plt.plot(steps_in_calculation, birch_fp_accumulator, 'k^')
+
+    plt.xlabel('% of added noise')
+    plt.ylabel('% of false positive')
     plt.legend([line_k_means, line_birch, line_gaussian, line_agglomerative],
                ['K-means', 'Birch', 'Gaussian Mixture', 'Agglomerative Clustering'], loc='best')
 
@@ -310,7 +415,7 @@ def main(_):
 
     bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks', architecture_chosen=FLAGS.architecture)
 
-    if FLAGS.test == "benchmark":
+    if FLAGS.test == "benchmark_classifier":
 
         benchmark_one_class_poluted(bottlenecks['Cat'], bottlenecks['Noise'], 'Cat labels, polluted by random images')
         benchmark_one_class_poluted(bottlenecks['Flag'], bottlenecks['Noise'], 'Flag labels, polluted by random images')
@@ -318,7 +423,12 @@ def main(_):
 
         plt.show()
 
-    if FLAGS.test == "isomap":
+    elif FLAGS.test == "benchmark_semi_supervised":
+        benchmark_semi_supervised(bottlenecks['Flag'], bottlenecks['Noise'][: int(len(bottlenecks['Flag']) * 0.05), :],
+                                  suptitle='Flag labels, with 5 % of random images')
+
+        plt.show()
+    elif FLAGS.test == "isomap":
         # Close label test
         X = np.concatenate((bottlenecks['Cat'], bottlenecks['Dog'][: int(len(bottlenecks['Cat']) * 0.05), :]))
         Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(int(len(bottlenecks['Dog']) * 0.05))))
@@ -331,23 +441,26 @@ def main(_):
         see_iso_map(X, Y, 'Cat labels, with 5 % of Dog Noise and 15 % of Random Images')
 
         X = np.concatenate((bottlenecks['Cat'], bottlenecks['Noise']))
-        Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(len(bottlenecks['Noise']) )))
+        Y = np.concatenate((np.zeros(len(bottlenecks['Cat'])), np.ones(len(bottlenecks['Noise']))))
         see_iso_map(X, Y, 'Cat labels, with 15 % of Random Images')
 
         plt.show()
 
+    else:
+        print('Wrong argument passed, with --test')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--test',
         type=str,
-        default='',
+        default=None,
         help="""\
            Wich test you want to be executed.
            Either :
            - isomap
-           - benchmark\
+           - benchmark_classifier
+           - benchmark_semi_supervised\
            """
     )
     parser.add_argument(
