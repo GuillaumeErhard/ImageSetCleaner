@@ -62,18 +62,18 @@ You can create your own pollution values, that are more specefic to your problem
 
 ![cat_vs_dog](https://user-images.githubusercontent.com/25333848/33291975-ec609138-d3c7-11e7-952f-198eb827680c.png)
 
-As expected this method works realy great, for the images or labels that our pretrained CNN has seen, and we can also see that our estimator as a breaking point between 40-45 %. This is due to the process of normalizing the predictions, as inliers for the smallest cluster. 
+As expected this method works realy great, for images or labels that our pretrained CNN has seen. So if you have a need specific, or checking a constant data stream, with known outcome of images, I encourage you to use a custom CNN and adapt the code, and/or use the create_noise_bottlenecks script , for better performance.  We can also see that our estimator as a breaking point between 40-45 %. This is due to the process of normalizing the predictions, and choosing as inliers the smallest cluster. 
 
-![cat_vs_random](https://user-images.githubusercontent.com/25333848/33291976-ec761382-d3c7-11e7-88f1-ef7c41905176.png)
+![google_test_graphic_card](https://user-images.githubusercontent.com/25333848/33580223-a11e9d70-d94c-11e7-8d71-013dd47df9c9.png)
 
-![flag_vs_random](https://user-images.githubusercontent.com/25333848/33291977-ec8b0ddc-d3c7-11e7-9766-2cfa22691e2b.png)
+![google_test_knife](https://user-images.githubusercontent.com/25333848/33580224-a13a624e-d94c-11e7-96b2-d1a79a55058b.png)
 
-In these two graphs, we can see that to achieve a better solution, that is, to limite the false negative we need a pollution of around, 10/15 %. That is why precomputed values of random images are added, to always achieve this condition. On the other hand to limit the extra work, given by false positive, is a more random process, especially for labels outside the models reach.
+In these two graphs, we can see that that we can achieve a detection of up to 90 % of wrong labels from an unreliable data source, while minimizing false positives to under 10 % of our set. 
 
 
 ## Visualisation
 
-Here is a visualisation of this problem after different iso map transformations to validate the process, and get an intuition of what is happening.
+Here is a visualisation of this problem after different iso map transformations to validate the process, by looking at the separability of our two clusters and get an intuition of what is happening.
 
 ![iso_map](https://user-images.githubusercontent.com/25333848/33291978-ecb897ca-d3c7-11e7-8336-2c58f86e10f9.gif)
 
