@@ -68,7 +68,7 @@ As expected this method works realy great, for images or labels that our pretrai
 
 ![google_test_knife](https://user-images.githubusercontent.com/25333848/33580224-a13a624e-d94c-11e7-96b2-d1a79a55058b.png)
 
-In these two graphs, we can see that that we can achieve a detection of up to 90 % of wrong labels from an unreliable data source, while minimizing false positives to under 10 % of our set. This can bring your data set, from unsalvageable or too expensive to correct or gather, to something that could be use for training despite residual noise ( see : [Here]:(https://arxiv.org/abs/1406.2080) )
+In these two graphs, we can see that that we can achieve a detection of up to 90 % of wrong labels from an unreliable data source, while minimizing false positives to under 10 % of our set. This can bring your data set, from unsalvageable or too expensive to correct or gather, to something that could be use for training despite residual noise ( see : [Here](https://arxiv.org/abs/1406.2080) )
 
 
 ## Visualisation
