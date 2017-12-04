@@ -79,14 +79,12 @@ class MainWindow(QMainWindow):
         current_selection = self.window.get_selection()
 
         dir_relocation = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
-        print(dir_relocation)
 
         if dir_relocation:
             move_images(dir_relocation, current_selection)
 
             self.paths_processed += current_selection
             remaining_paths = self.window.paths
-            print(self.paths_processed)
             for path in self.paths_processed:
                 try:
                     remaining_paths.remove(path)

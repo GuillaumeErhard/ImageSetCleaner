@@ -129,7 +129,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--pollution_percent',
         type=float,
-        default=25,
+        default=10,
         help="""\
             Give the percentage of pre-computed noisy / polluted bottlenecks, from random images to help the clustering
             algorithm get a good fit.\

@@ -410,7 +410,7 @@ def see_false_negative(image_set, predictions, ground_truth):
 def main(_):
 
     # Just add your own labels, with distinct directory and update; the variables
-    image_dir = ['./Cat', './Dog', './Flag', './Noise']
+    image_dir = ['./Cat', './Dog', './Flag', './Noise', './Graphic_card', './Not_graphic_card', './Knife', './Not_knife']
 
     bottlenecks = load_bottleneck(image_dir, './Saved_bottlenecks', architecture_chosen=FLAGS.architecture)
 
@@ -423,6 +423,13 @@ def main(_):
         plt.show()
 
     elif FLAGS.test == "benchmark_semi_supervised":
+        benchmark_semi_supervised(bottlenecks['Graphic_card'], bottlenecks['Not_graphic_card'],
+                                  suptitle='Results on google image querry \'graphic card\' (408 inliers, 174 outliers)')
+
+        benchmark_semi_supervised(bottlenecks['Knife'], bottlenecks['Not_knife'],
+                                  suptitle='Results on google image querry \'knife\' (532 inliers, 34 outliers)')
+
+
         benchmark_semi_supervised(bottlenecks['Flag'], bottlenecks['Noise'][: int(len(bottlenecks['Flag']) * 0.05), :],
                                   suptitle='Flag labels, with 5 % of random images')
 
