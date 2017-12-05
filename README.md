@@ -3,7 +3,7 @@
 
 ## Usage
 
-This algorithm is well suited to validate labelled images obtained with web scrapping, untrusted sources or colloborative generated labels.
+This algorithm is well suited to validate labelled images obtained with web scrapping, untrusted sources or colloborativly generated labels.
 
 
 
