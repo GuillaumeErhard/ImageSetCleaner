@@ -45,7 +45,7 @@ You will then see a GUI pop up where you will be able to fine tune the detection
 
  ['inception_v3', 'mobilenet_1.0_224', 'mobilenet_1.0_192', 'mobilenet_1.0_160', 'mobilenet_1.0_128','mobilenet_0.75_224', 'mobilenet_0.75_192', 'mobilenet_0.75_160', 'mobilenet_0.75_128', 'mobilenet_0.50_224', 'mobilenet_0.50_192', 'mobilenet_0.50_160', 'mobilenet_0.50_128', 'mobilenet_0.25_224', 'mobilenet_0.25_192', 'mobilenet_0.25_160', 'mobilenet_0.25_128']
 
- The mobilenet follow the pattern : mobilenet_<parameter size>_<input_size>
+ The mobilenets follow the pattern : mobilenet_<parameter size>_<input_size>
 
 * --model_dir: Path where you want the weights and description to be downloaded, or if already done
 
