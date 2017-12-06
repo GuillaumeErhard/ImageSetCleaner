@@ -1,0 +1,7 @@
+tensorflow==1.2.1
+numpy==1.13.1
+matplotlib==2.0.2
+Pillow==4.3.0
+PyQt5==5.9.2
+six==1.11.0
+scikit_learn==0.19.1
