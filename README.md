@@ -1,4 +1,5 @@
-# Semi-supervised detection of wrong label in labeled data set
+# Semi-supervised detection of wrong labels in labeled data set
+
 ![demo_gui_cut](https://user-images.githubusercontent.com/25333848/33291972-e7f8c908-d3c7-11e7-8a32-95abc1d216e4.gif)
 
 ## Usage
