@@ -65,9 +65,11 @@ You can create your own pollution values, that are more specefic to your problem
 
 ![cat_vs_dog](https://user-images.githubusercontent.com/25333848/33291975-ec609138-d3c7-11e7-952f-198eb827680c.png)
 
+These graphs are generated using a set of cat images (inliers), and a percentage gradualy increasing of dog images.
+
 As expected this method works realy great, for images or labels that our pretrained CNN has seen. So if you have a need specific, or checking a constant data stream, with known outcome of images, I encourage you to use a custom CNN and adapt the code, and/or use the create_noise_bottlenecks script, for better performance.  
 
-Furthermore from this graph the breaking point of our estimator can be estimated at between 40-45 % of noise. This is due to the process of normalizing the predictions, and choosing as inliers the smallest cluster. 
+Furthermore from these graphs the breaking point of our estimator can be estimated at between 40-45 % of noise. This is due to the process of normalizing the predictions, and choosing as inliers the smallest cluster. 
 
 ![google_test_graphic_card](https://user-images.githubusercontent.com/25333848/33580223-a11e9d70-d94c-11e7-8d71-013dd47df9c9.png)
 
